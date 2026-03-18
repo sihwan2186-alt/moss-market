@@ -19,11 +19,18 @@ async function dbConnect(): Promise<mongoose.Connection> {
   if (cached.conn) {
     return cached.conn
   }
+
+  const mongoUri = process.env.MONGODB_URI
+
+  if (!mongoUri) {
+    throw new Error('MONGODB_URI is not defined. Add it to your .env.local file.')
+  }
+
   if (!cached.promise) {
     const opts = {
       bufferCommands: false,
     }
-    cached.promise = mongoose.connect(process.env.MONGODB_URI as string, opts).then((mongoose) => {
+    cached.promise = mongoose.connect(mongoUri, opts).then((mongoose) => {
       return mongoose.connection
     })
   }

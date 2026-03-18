@@ -1,21 +1,44 @@
-// db\models\user.ts
-import mongoose from 'mongoose'
+import mongoose, { Model, Schema } from 'mongoose'
 
-const UserSchema = new mongoose.Schema(
+export interface IUser {
+  name: string
+  email: string
+  passwordHash: string
+  role: 'customer' | 'admin'
+  createdAt: Date
+  updatedAt: Date
+}
+
+const UserSchema = new Schema<IUser>(
   {
-    email: { type: String, default: '' },
-    nickname: { type: String, default: '' },
-    profile_image_url: { type: String, default: '' },
-    user_type: { type: String, default: '' },
-    createdAt: { type: Date, default: Date.now },
-    updatedAt: { type: Date, default: Date.now },
+    name: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    email: {
+      type: String,
+      required: true,
+      unique: true,
+      lowercase: true,
+      trim: true,
+    },
+    passwordHash: {
+      type: String,
+      required: true,
+    },
+    role: {
+      type: String,
+      enum: ['customer', 'admin'],
+      default: 'customer',
+    },
   },
   {
     timestamps: true,
-    collection: 'user',
+    collection: 'users',
   }
 )
 
-const User = mongoose.models.User || mongoose.model('User', UserSchema)
+const User = (mongoose.models.User as Model<IUser>) || mongoose.model<IUser>('User', UserSchema)
 
 export default User
