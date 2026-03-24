@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import OrderStatusBadge from '@/components/OrderStatusBadge'
@@ -136,7 +137,13 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
               <div className="mt-6 space-y-4">
                 {order.items.map((item, index) => (
                   <article key={`${displayOrderId}-${index}`} className="flex gap-4 rounded-[24px] bg-[#faf7f1] p-4">
-                    <img src={item.image} alt={item.name} className="h-24 w-24 rounded-2xl object-cover" />
+                    <Image
+                      src={item.image}
+                      alt={item.name}
+                      width={96}
+                      height={96}
+                      className="h-24 w-24 rounded-2xl object-cover"
+                    />
                     <div className="flex-1">
                       <h2 className="text-lg font-bold">{item.name}</h2>
                       <p className="mt-2 text-sm text-[#5d6a61]">Quantity {item.quantity}</p>

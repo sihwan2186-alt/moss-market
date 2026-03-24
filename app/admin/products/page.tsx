@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import { useEffect, useState } from 'react'
 import StoreHeader from '@/components/StoreHeader'
 
@@ -285,9 +286,11 @@ export default function AdminProductsPage() {
                     key={product._id}
                     className="overflow-hidden rounded-[24px] border border-black/5 bg-[#faf7f1]"
                   >
-                    <img
+                    <Image
                       src={product.images[0] ?? ''}
                       alt={product.name}
+                      width={800}
+                      height={440}
                       className="h-44 w-full bg-[#e8dfd2] object-cover"
                     />
                     <div className="space-y-3 p-4">

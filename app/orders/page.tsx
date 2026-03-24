@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import OrderStatusBadge from '@/components/OrderStatusBadge'
@@ -122,7 +123,13 @@ export default function OrdersPage() {
                 <div className="mt-5 space-y-4">
                   {order.items.map((item, index) => (
                     <div key={`${orderId}-${index}`} className="flex items-center gap-4">
-                      <img src={item.image} alt={item.name} className="h-20 w-20 rounded-2xl object-cover" />
+                      <Image
+                        src={item.image}
+                        alt={item.name}
+                        width={80}
+                        height={80}
+                        className="h-20 w-20 rounded-2xl object-cover"
+                      />
                       <div className="flex-1">
                         <p className="font-semibold">{item.name}</p>
                         <p className="text-sm text-[#5d6a61]">Qty {item.quantity}</p>

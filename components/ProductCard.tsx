@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import Link from 'next/link'
 import { useState } from 'react'
 
@@ -49,9 +50,11 @@ export default function ProductCard({ id, name, description, price, image, categ
     <article className="group overflow-hidden rounded-[28px] border border-black/5 bg-white shadow-[0_18px_60px_rgba(17,24,39,0.08)]">
       <Link href={`/products/${id}`} className="block">
         <div className="aspect-[4/3] overflow-hidden bg-[#e8dfd2]">
-          <img
+          <Image
             src={image}
             alt={name}
+            width={900}
+            height={675}
             className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
           />
         </div>

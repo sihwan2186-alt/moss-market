@@ -1,3 +1,4 @@
+import Image from 'next/image'
 import ProductDetailActions from '@/components/ProductDetailActions'
 import StoreHeader from '@/components/StoreHeader'
 import { getProductByIdWithFallback } from '@/lib/store'
@@ -46,7 +47,13 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
 
         <section className="mt-8 grid gap-8 rounded-[32px] bg-white p-6 shadow-[0_18px_60px_rgba(17,24,39,0.08)] lg:grid-cols-[1.1fr_0.9fr] lg:p-8">
           <div className="overflow-hidden rounded-[28px] bg-[#e8dfd2]">
-            <img src={product.images[0] ?? ''} alt={product.name} className="h-full w-full object-cover" />
+            <Image
+              src={product.images[0] ?? ''}
+              alt={product.name}
+              width={1200}
+              height={900}
+              className="h-full w-full object-cover"
+            />
           </div>
           <div className="flex flex-col justify-between gap-8">
             <div>

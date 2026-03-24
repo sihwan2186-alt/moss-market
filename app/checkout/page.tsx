@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import StoreHeader from '@/components/StoreHeader'
@@ -131,7 +132,13 @@ export default function CheckoutPage() {
               )}
               {items.map((item) => (
                 <article key={item.productId} className="flex gap-4 rounded-[24px] bg-[#faf7f1] p-4">
-                  <img src={item.image} alt={item.name} className="h-20 w-20 rounded-2xl object-cover" />
+                  <Image
+                    src={item.image}
+                    alt={item.name}
+                    width={80}
+                    height={80}
+                    className="h-20 w-20 rounded-2xl object-cover"
+                  />
                   <div className="flex-1">
                     <h3 className="font-bold">{item.name}</h3>
                     <p className="mt-2 text-sm text-[#5d6a61]">Quantity {item.quantity}</p>
