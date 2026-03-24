@@ -11,6 +11,19 @@ Next.js, TypeScript, Next.js API routes, Tailwind CSS, and MongoDB based storefr
 - Admin order monitoring
 - MongoDB mode with local fallback storage for development resilience
 
+## Requirement checklist
+
+- Product image display: complete
+- Simple product registration: complete
+- Price display: complete
+- Add to cart: complete
+- Sign up: complete
+- Login: complete
+- Logout: complete
+- Purchase page: complete
+- Purchase history: complete
+- Vercel free-tier deployment target: prepared
+
 ## Stack
 
 - Frontend: Next.js App Router + TypeScript
