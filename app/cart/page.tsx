@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import StoreHeader from '@/components/StoreHeader'
 
@@ -208,6 +209,14 @@ export default function CartPage() {
             >
               Open test payment
             </button>
+            <Link
+              href="/checkout"
+              className={`mt-3 block w-full rounded-full border border-[#f0e7d8] px-5 py-3 text-center text-sm font-semibold text-[#f0e7d8] ${
+                items.length === 0 || needsLogin ? 'pointer-events-none opacity-40' : ''
+              }`}
+            >
+              Go to purchase page
+            </Link>
             <p className="mt-3 text-xs text-[#c7d5cb]">
               This opens a demo payment form only. No real payment is processed.
             </p>
