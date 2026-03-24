@@ -1,0 +1,110 @@
+import { NextRequest, NextResponse } from 'next/server'
+import dbConnect from '@/db/dbConnect'
+import User from '@/db/models/user'
+import { hashPassword } from '@/lib/auth'
+import { createLocalUser, findLocalUserByEmail } from '@/lib/dev-user-store'
+
+type SignUpBody = {
+  name?: string
+  email?: string
+  password?: string
+}
+
+function isConnectionError(message: string) {
+  return (
+    message.includes('querySrv') ||
+    message.includes('ECONNREFUSED') ||
+    message.includes('ENOTFOUND') ||
+    message.includes('buffering timed out')
+  )
+}
+
+export async function POST(request: NextRequest) {
+  const body = (await request.json()) as SignUpBody
+  const name = body.name?.trim()
+  const email = body.email?.trim().toLowerCase()
+  const password = body.password?.trim()
+
+  if (!name || !email || !password) {
+    return NextResponse.json({ message: 'Name, email, and password are required.' }, { status: 400 })
+  }
+
+  if (password.length < 8) {
+    return NextResponse.json({ message: 'Password must be at least 8 characters long.' }, { status: 400 })
+  }
+
+  try {
+    await dbConnect()
+
+    const existingUser = await User.findOne({ email })
+
+    if (existingUser) {
+      return NextResponse.json({ message: 'This email is already registered.' }, { status: 409 })
+    }
+
+    const user = await User.create({
+      name,
+      email,
+      passwordHash: hashPassword(password),
+      role: 'customer',
+    })
+
+    return NextResponse.json(
+      {
+        message: 'Account created successfully.',
+        user: {
+          id: user._id.toString(),
+          name: user.name,
+          email: user.email,
+          role: user.role,
+        },
+      },
+      { status: 201 }
+    )
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown sign up error'
+
+    if (isConnectionError(message)) {
+      const existingLocalUser = await findLocalUserByEmail(email)
+
+      if (existingLocalUser) {
+        return NextResponse.json(
+          {
+            message: 'This email is already registered.',
+            mode: 'local-fallback',
+          },
+          { status: 409 }
+        )
+      }
+
+      const localUser = await createLocalUser({
+        name,
+        email,
+        passwordHash: hashPassword(password),
+        role: 'customer',
+      })
+
+      return NextResponse.json(
+        {
+          message: 'Account created successfully. The app is currently using local fallback mode.',
+          mode: 'local-fallback',
+          user: {
+            id: localUser.id,
+            name: localUser.name,
+            email: localUser.email,
+            role: localUser.role,
+          },
+        },
+        { status: 201 }
+      )
+    }
+
+    return NextResponse.json(
+      {
+        message: 'Sign up failed.',
+        error: message,
+      },
+      { status: 500 }
+    )
+  }
+}

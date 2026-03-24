@@ -1,143 +1,105 @@
 'use client'
 
-import { Gaitwise } from '@/public/svg'
-import Image from 'next/image'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useState } from 'react'
-import styled from 'styled-components'
+import AuthShell from '@/components/AuthShell'
 
 export default function SignUp() {
+  const router = useRouter()
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [role, setRole] = useState('analyst')
+  const [message, setMessage] = useState('')
+  const [hint, setHint] = useState('')
+  const [isError, setIsError] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
 
   const handleSignUp = async () => {
-    const res = await fetch('/api/signup', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ name, email, password, role }),
-    })
+    try {
+      setIsLoading(true)
+      setMessage('')
+      setHint('')
+      setIsError(false)
 
-    if (res.ok) {
-      alert('アカウント作成成功')
-    } else {
-      alert('アカウント作成失敗')
+      const res = await fetch('/api/signup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ name, email, password }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        setIsError(true)
+        setMessage(data.message ?? 'Sign up failed.')
+        setHint(data.hint ?? '')
+        return
+      }
+
+      setMessage(data.message ?? 'Account created successfully.')
+      setHint(data.mode === 'local-fallback' ? 'Saved in local fallback mode because MongoDB is unavailable.' : '')
+      setName('')
+      setEmail('')
+      setPassword('')
+
+      window.setTimeout(() => {
+        router.push('/auth?type=login')
+        router.refresh()
+      }, 700)
+    } catch {
+      setIsError(true)
+      setMessage('Unable to reach the server.')
+      setHint('')
+    } finally {
+      setIsLoading(false)
     }
   }
 
   return (
-    <SignUpBox>
-      <Image src={Gaitwise} alt="logo" width={100} height={100} layout="responsive" />
-      <Title>Create Account</Title>
-      <Subtitle>Doctor must authenticate after Login</Subtitle>
-
-      <RoleSelect>
-        <label>
-          <input
-            type="radio"
-            name="role"
-            value="analyst"
-            checked={role === 'analyst'}
-            onChange={(e) => setRole(e.target.value)}
-          />
-          Analysts
-        </label>
-        <label>
-          <input
-            type="radio"
-            name="role"
-            value="doctor"
-            checked={role === 'doctor'}
-            onChange={(e) => setRole(e.target.value)}
-          />
-          Doctor
-        </label>
-      </RoleSelect>
-
-      <InputField type="text" placeholder="Your Name" value={name} onChange={(e) => setName(e.target.value)} />
-      <InputField type="email" placeholder="Your Email" value={email} onChange={(e) => setEmail(e.target.value)} />
-      <InputField
+    <AuthShell
+      title="Create account"
+      subtitle="Create your customer account to start shopping."
+      footer={
+        <Link href="/auth?type=login" className="font-semibold text-[#1d3124] underline underline-offset-4">
+          Already have an account? Sign in
+        </Link>
+      }
+    >
+      <input
+        type="text"
+        placeholder="Name"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        className="w-full rounded-2xl border border-black/10 bg-[#f9f7f2] px-4 py-3 outline-none transition focus:border-[#68806f]"
+      />
+      <input
+        type="email"
+        placeholder="Email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        className="w-full rounded-2xl border border-black/10 bg-[#f9f7f2] px-4 py-3 outline-none transition focus:border-[#68806f]"
+      />
+      <input
         type="password"
-        placeholder="Password"
+        placeholder="Password (min 8 chars)"
         value={password}
         onChange={(e) => setPassword(e.target.value)}
+        className="w-full rounded-2xl border border-black/10 bg-[#f9f7f2] px-4 py-3 outline-none transition focus:border-[#68806f]"
       />
 
-      <SignUpButton onClick={handleSignUp}>Sign Up</SignUpButton>
+      <button
+        onClick={handleSignUp}
+        disabled={isLoading}
+        className="w-full rounded-full bg-[#1d3124] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#294532] disabled:cursor-wait disabled:opacity-60"
+      >
+        {isLoading ? 'Creating account...' : 'Sign up'}
+      </button>
 
-      <Links>
-        <a href="/auth?type=login">Already have an account? Sign In</a>
-      </Links>
-    </SignUpBox>
+      {message && <p className={`text-center text-sm ${isError ? 'text-[#b23a3a]' : 'text-[#2f6d43]'}`}>{message}</p>}
+      {hint && <p className="text-center text-sm text-[#5d6a61]">{hint}</p>}
+    </AuthShell>
   )
 }
-
-const SignUpBox = styled.div`
-  background: white;
-  padding: 2rem;
-  border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-  text-align: center;
-  width: 350px;
-`
-
-const Title = styled.h2`
-  font-size: 1.5rem;
-  margin-bottom: 0.5rem;
-`
-
-const Subtitle = styled.p`
-  color: #666;
-  margin-bottom: 1.5rem;
-`
-
-const RoleSelect = styled.div`
-  display: flex;
-  justify-content: center;
-  margin-bottom: 1rem;
-
-  label {
-    margin: 0 1rem;
-    font-size: 1rem;
-  }
-`
-
-const InputField = styled.input`
-  width: 100%;
-  padding: 0.75rem;
-  margin-bottom: 1rem;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  font-size: 1rem;
-  background-color: #f9f9f9;
-`
-
-const SignUpButton = styled.button`
-  width: 100%;
-  padding: 0.75rem;
-  background-color: #2d3748;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 1rem;
-
-  &:hover {
-    background-color: #1a202c;
-  }
-`
-
-const Links = styled.div`
-  margin-top: 1rem;
-
-  a {
-    color: #3182ce;
-    text-decoration: none;
-  }
-
-  a:hover {
-    text-decoration: underline;
-  }
-`

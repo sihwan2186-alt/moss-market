@@ -1,179 +1,116 @@
 'use client'
 
-import { useState, Suspense } from 'react'
-import styled from 'styled-components'
-import SignUp from './Signup'
+import { Suspense, useState } from 'react'
+import Link from 'next/link'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { signIn } from 'next-auth/react'
+import AuthShell from '@/components/AuthShell'
 import ForgetPassword from './ForgetPass'
-import { Gaitwise } from '@/public/svg'
-import Image from 'next/image'
-import { useSearchParams } from 'next/navigation'
+import SignUp from './Signup'
 
 function AuthContent() {
-  const searchParams = useSearchParams() // URLのクエリパラメータを取得
-  const type = searchParams.get('type') // 'type' クエリパラメータを取得
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const type = searchParams.get('type')
 
-  const [username, setUsername] = useState('')
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [role, setRole] = useState('analyst')
+  const [message, setMessage] = useState('')
+  const [isError, setIsError] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
 
   const handleLogin = async () => {
-    const res = await fetch('/api/login', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ username, password, role }),
-    })
+    try {
+      setIsLoading(true)
+      setMessage('')
+      setIsError(false)
 
-    if (res.ok) {
-      alert('ログイン成功')
-    } else {
-      alert('ログイン失敗')
+      const result = await signIn('credentials', {
+        email,
+        password,
+        redirect: false,
+      })
+
+      if (!result?.ok) {
+        setIsError(true)
+        setMessage('Login failed. Please check your email and password.')
+        return
+      }
+
+      setMessage('Login successful.')
+      setEmail('')
+      setPassword('')
+
+      window.setTimeout(() => {
+        router.push('/')
+        router.refresh()
+      }, 400)
+    } catch {
+      setIsError(true)
+      setMessage('Unable to reach the server.')
+    } finally {
+      setIsLoading(false)
     }
   }
 
+  if (type === 'sign-up') {
+    return <SignUp />
+  }
+
+  if (type === 'forgetpass') {
+    return <ForgetPassword />
+  }
+
   return (
-    <Container>
-      {type === 'login' && (
-        <LoginBox>
-          <Image src={Gaitwise} alt="logo" width={100} height={100} layout="responsive" />
-          <Title>Hi, Welcome Back!</Title>
-          <Subtitle>Please select a Type</Subtitle>
+    <AuthShell
+      title="Login"
+      subtitle="Sign in to your customer account."
+      footer={
+        <>
+          <Link href="/auth?type=forgetpass" className="font-semibold text-[#1d3124] underline underline-offset-4">
+            Forgot password?
+          </Link>
+          <p className="mt-3">
+            Need an account?{' '}
+            <Link href="/auth?type=sign-up" className="font-semibold text-[#1d3124] underline underline-offset-4">
+              Sign up
+            </Link>
+          </p>
+        </>
+      }
+    >
+      <input
+        type="email"
+        placeholder="Email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        className="w-full rounded-2xl border border-black/10 bg-[#f9f7f2] px-4 py-3 outline-none transition focus:border-[#68806f]"
+      />
+      <input
+        type="password"
+        placeholder="Password"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        className="w-full rounded-2xl border border-black/10 bg-[#f9f7f2] px-4 py-3 outline-none transition focus:border-[#68806f]"
+      />
 
-          <RoleSelect>
-            <label>
-              <input
-                type="radio"
-                name="role"
-                value="analyst"
-                checked={role === 'analyst'}
-                onChange={(e) => setRole(e.target.value)}
-              />
-              Analysts
-            </label>
-            <label>
-              <input
-                type="radio"
-                name="role"
-                value="doctor"
-                checked={role === 'doctor'}
-                onChange={(e) => setRole(e.target.value)}
-              />
-              Doctor
-            </label>
-          </RoleSelect>
+      <button
+        onClick={handleLogin}
+        disabled={isLoading}
+        className="w-full rounded-full bg-[#1d3124] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#294532] disabled:cursor-wait disabled:opacity-60"
+      >
+        {isLoading ? 'Signing in...' : 'Login'}
+      </button>
 
-          <InputField
-            type="email"
-            placeholder="Your Email"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-          />
-          <InputField
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-
-          <LoginButton onClick={handleLogin}>Sign In</LoginButton>
-
-          <Links>
-            <a href="/auth?type=forgetpass">Forgot password?</a>
-            <p>
-              Don’t have an account yet? <a href="/auth?type=sign-up">Sign up</a>
-            </p>
-          </Links>
-        </LoginBox>
-      )}
-
-      {type === 'sign-up' && <SignUp />}
-
-      {type === 'forgetpass' && <ForgetPassword />}
-    </Container>
+      {message && <p className={`text-center text-sm ${isError ? 'text-[#b23a3a]' : 'text-[#2f6d43]'}`}>{message}</p>}
+    </AuthShell>
   )
 }
 
 export default function AuthPage() {
   return (
-    <Suspense fallback={<div>Loading...</div>}>
+    <Suspense fallback={<div className="p-8 text-center text-sm text-[#5d6a61]">Loading...</div>}>
       <AuthContent />
     </Suspense>
   )
 }
-
-const Container = styled.div`
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 100vh;
-  background-color: #f0f4f8;
-`
-
-const LoginBox = styled.div`
-  background: white;
-  padding: 2rem;
-  border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-  text-align: center;
-  width: 350px;
-`
-
-const Title = styled.h2`
-  font-size: 1.5rem;
-  margin-bottom: 0.5rem;
-`
-
-const Subtitle = styled.p`
-  color: #666;
-  margin-bottom: 1.5rem;
-`
-
-const RoleSelect = styled.div`
-  display: flex;
-  justify-content: center;
-  margin-bottom: 1rem;
-
-  label {
-    margin: 0 1rem;
-    font-size: 1rem;
-  }
-`
-
-const InputField = styled.input`
-  width: 100%;
-  padding: 0.75rem;
-  margin-bottom: 1rem;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  font-size: 1rem;
-  background-color: #f9f9f9;
-`
-
-const LoginButton = styled.button`
-  width: 100%;
-  padding: 0.75rem;
-  background-color: #2d3748;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 1rem;
-
-  &:hover {
-    background-color: #1a202c;
-  }
-`
-
-const Links = styled.div`
-  margin-top: 1rem;
-
-  a {
-    color: #3182ce;
-    text-decoration: none;
-  }
-
-  a:hover {
-    text-decoration: underline;
-  }
-`

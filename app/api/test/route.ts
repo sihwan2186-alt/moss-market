@@ -1,39 +1,39 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import dbConnect from '@/db/dbConnect'
 import User from '@/db/models/user'
 
-/**
- * @description nickname 중복 확인 + 사용자 정보 표시
- * @searchParams nickname
- */
-export async function GET(req: NextRequest) {
-  await dbConnect()
-  const nickname = req.nextUrl.searchParams.get('nickname')
+export async function GET() {
+  try {
+    const connection = await dbConnect()
+    const userCount = await User.countDocuments()
 
-  if (!nickname) {
-    return NextResponse.json({ message: '닉네임이 지정되지 않았습니다.' }, { status: 400 })
-  }
-
-  const existingUser = await User.findOne({ nickname: nickname })
-
-  if (existingUser) {
-    // 사용자가 존재하는 경우, 그 정보를 모두 반환
     return NextResponse.json(
       {
-        message: '이 닉네임은 이미 사용 중입니다.',
-        user: {
-          email: existingUser.email,
-          nickname: existingUser.nickname,
-          profile_image_url: existingUser.profile_image_url,
-          user_type: existingUser.user_type,
-          createdAt: existingUser.createdAt,
-          updatedAt: existingUser.updatedAt,
+        ok: true,
+        message: 'MongoDB connection successful.',
+        database: connection.name,
+        host: connection.host,
+        readyState: connection.readyState,
+        collections: {
+          users: userCount,
         },
       },
       { status: 200 }
     )
-  }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown database error'
+    const hint = message.includes('querySrv')
+      ? 'Your network or DNS is blocking MongoDB SRV lookups. Try using the standard MongoDB connection string from Atlas instead of mongodb+srv.'
+      : undefined
 
-  // 사용자가 존재하지 않는 경우
-  return NextResponse.json({ message: '사용 가능한 닉네임입니다.' }, { status: 200 })
+    return NextResponse.json(
+      {
+        ok: false,
+        message: 'MongoDB connection failed.',
+        error: message,
+        hint,
+      },
+      { status: 500 }
+    )
+  }
 }

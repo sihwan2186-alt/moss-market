@@ -1,127 +1,140 @@
 'use client'
-import React, { useState } from 'react'
-import styled from 'styled-components'
-import axios from 'axios'
-import { User } from '@/types/user'
 
-export default function Page() {
-  const [nickname, setNickname] = useState('') // 닉네임 상태
-  const [result, setResult] = useState('') // 결과 메시지 상태
-  const [userData, setUserData] = useState<User | null>(null) // 가져온 사용자 데이터
+import Link from 'next/link'
+import { useState } from 'react'
+import StoreHeader from '@/components/StoreHeader'
 
-  // API 호출 함수
-  const checkNickname = async () => {
-    if (!nickname) {
-      setResult('닉네임을 입력해주세요.')
-      setUserData(null) // 사용자 데이터 초기화
-      return
-    }
+type HealthResponse = {
+  ok: boolean
+  message: string
+  database?: string
+  host?: string
+  readyState?: number
+  collections?: {
+    users: number
+  }
+  error?: string
+  hint?: string
+}
 
+export default function DatabaseCheckPage() {
+  const [result, setResult] = useState<HealthResponse | null>(null)
+  const [loading, setLoading] = useState(false)
+
+  const checkDatabase = async () => {
     try {
-      const res = await axios.get(`/api/test?nickname=${nickname}`)
-
-      const data = res.data
-      if (res.status === 200) {
-        setResult(data.message) // API로부터의 메시지 설정
-        setUserData(data.user || null) // user 데이터가 존재하면 설정
-      } else {
-        setResult('닉네임 확인에 실패했습니다.')
-        setUserData(null) // 사용자 데이터 초기화
-      }
+      setLoading(true)
+      const response = await fetch('/api/test', {
+        cache: 'no-store',
+      })
+      const data = (await response.json()) as HealthResponse
+      setResult(data)
     } catch {
-      setResult('오류가 발생했습니다.')
-      setUserData(null) // 사용자 데이터 초기화
+      setResult({
+        ok: false,
+        message: 'Request failed before the API could respond.',
+        error: 'Check whether the development server is running.',
+      })
+    } finally {
+      setLoading(false)
     }
   }
 
   return (
-    <Container>
-      <Title>닉네임 중복 확인</Title>
-      <Input type="text" value={nickname} onChange={(e) => setNickname(e.target.value)} placeholder="닉네임을 입력" />
-      <Button onClick={checkNickname}>확인</Button>
-      {result && <Result>{result}</Result>}
+    <div className="min-h-screen bg-[#f7f1e8] text-[#18261d]">
+      <StoreHeader />
+      <main className="mx-auto max-w-5xl px-6 py-10">
+        <section className="rounded-[36px] bg-[radial-gradient(circle_at_top_left,_rgba(108,148,123,0.28),_transparent_38%),linear-gradient(135deg,_#efe5d6_0%,_#f8f2ea_48%,_#e4ecdf_100%)] p-8 shadow-[0_25px_80px_rgba(23,31,26,0.08)]">
+          <p className="text-sm font-semibold uppercase tracking-[0.3em] text-[#577363]">System check</p>
+          <h1 className="mt-3 text-4xl font-black tracking-tight">MongoDB connection health</h1>
+          <p className="mt-4 max-w-2xl text-base leading-7 text-[#49584c]">
+            Use this page before deployment to confirm the app can reach MongoDB and read the users collection.
+          </p>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <button
+              onClick={checkDatabase}
+              disabled={loading}
+              className="rounded-full bg-[#1d3124] px-6 py-3 text-sm font-semibold text-white disabled:cursor-wait disabled:opacity-60"
+            >
+              {loading ? 'Checking...' : 'Run health check'}
+            </button>
+            <Link
+              href="/"
+              className="rounded-full border border-[#1d3124] px-6 py-3 text-sm font-semibold text-[#1d3124]"
+            >
+              Back to shop
+            </Link>
+          </div>
+        </section>
 
-      {/* 사용자 데이터가 있을 때 표시 */}
-      {userData && (
-        <UserDataContainer>
-          <h2>사용자 데이터</h2>
-          <UserDataField>이메일: {userData.email}</UserDataField>
-          <UserDataField>닉네임: {userData.nickname}</UserDataField>
-          <UserDataField>프로필 이미지 URL: {userData.profile_image_url}</UserDataField>
-          <UserDataField>사용자 유형: {userData.user_type}</UserDataField>
-          <UserDataField>생성 날짜: {new Date(userData.createdAt).toLocaleString()}</UserDataField>
-          <UserDataField>업데이트 날짜: {new Date(userData.updatedAt).toLocaleString()}</UserDataField>
-        </UserDataContainer>
-      )}
-    </Container>
+        <section className="mt-8 grid gap-4 md:grid-cols-3">
+          <div className="rounded-[24px] bg-white p-5 shadow-[0_18px_60px_rgba(17,24,39,0.08)]">
+            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#68806f]">Step 1</p>
+            <p className="mt-3 font-bold">Check `.env.local`</p>
+            <p className="mt-2 text-sm text-[#5d6a61]">Confirm `MONGODB_URI` and `JWT_SECRET` are present.</p>
+          </div>
+          <div className="rounded-[24px] bg-white p-5 shadow-[0_18px_60px_rgba(17,24,39,0.08)]">
+            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#68806f]">Step 2</p>
+            <p className="mt-3 font-bold">Atlas network access</p>
+            <p className="mt-2 text-sm text-[#5d6a61]">
+              Allow your current IP or deployment environment in MongoDB Atlas.
+            </p>
+          </div>
+          <div className="rounded-[24px] bg-white p-5 shadow-[0_18px_60px_rgba(17,24,39,0.08)]">
+            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#68806f]">Step 3</p>
+            <p className="mt-3 font-bold">Run the API test</p>
+            <p className="mt-2 text-sm text-[#5d6a61]">A successful response means the server reached MongoDB.</p>
+          </div>
+        </section>
+
+        {result && (
+          <section
+            className={`mt-8 rounded-[28px] p-6 shadow-[0_18px_60px_rgba(17,24,39,0.08)] ${
+              result.ok ? 'bg-white' : 'border border-[#e1c9c9] bg-[#fff1f1]'
+            }`}
+          >
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-[0.25em] text-[#68806f]">Result</p>
+                <h2 className="mt-2 text-2xl font-black">{result.message}</h2>
+              </div>
+              <span
+                className={`rounded-full px-4 py-2 text-xs font-bold uppercase tracking-[0.2em] ${
+                  result.ok ? 'bg-[#e8f5ea] text-[#1e6b3a]' : 'bg-[#fde8e8] text-[#9a2f2f]'
+                }`}
+              >
+                {result.ok ? 'Healthy' : 'Needs attention'}
+              </span>
+            </div>
+
+            {result.ok ? (
+              <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <div className="rounded-[20px] bg-[#faf7f1] p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#68806f]">Database</p>
+                  <p className="mt-3 font-bold">{result.database}</p>
+                </div>
+                <div className="rounded-[20px] bg-[#faf7f1] p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#68806f]">Host</p>
+                  <p className="mt-3 break-all font-bold">{result.host}</p>
+                </div>
+                <div className="rounded-[20px] bg-[#faf7f1] p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#68806f]">Ready state</p>
+                  <p className="mt-3 font-bold">{result.readyState}</p>
+                </div>
+                <div className="rounded-[20px] bg-[#faf7f1] p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#68806f]">Users count</p>
+                  <p className="mt-3 font-bold">{result.collections?.users ?? 0}</p>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-6 space-y-3 text-sm text-[#7a3d3d]">
+                <p>Error: {result.error ?? 'Unknown error'}</p>
+                {result.hint && <p>Hint: {result.hint}</p>}
+              </div>
+            )}
+          </section>
+        )}
+      </main>
+    </div>
   )
 }
-
-// styled-components로 스타일 정의
-const Container = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  background-color: #f0f4f8;
-  padding: 20px;
-  border-radius: 10px;
-  max-width: 500px;
-  margin: 40px auto;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-`
-
-const Title = styled.h1`
-  font-size: 24px;
-  color: #333;
-  margin-bottom: 20px;
-`
-
-const Input = styled.input`
-  padding: 10px;
-  font-size: 16px;
-  width: 100%;
-  max-width: 300px;
-  border: 2px solid #ccc;
-  border-radius: 5px;
-  margin-bottom: 20px;
-  &:focus {
-    border-color: #0070f3;
-    outline: none;
-  }
-`
-
-const Button = styled.button`
-  background-color: #0070f3;
-  color: white;
-  padding: 10px 20px;
-  font-size: 16px;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-  transition: background-color 0.3s ease;
-  &:hover {
-    background-color: #005bb5;
-  }
-`
-
-const Result = styled.p`
-  font-size: 16px;
-  color: ${(props) => (props.children === '사용 가능한 닉네임입니다.' ? 'green' : 'red')};
-  margin-top: 20px;
-`
-
-const UserDataContainer = styled.div`
-  margin-top: 30px;
-  background-color: #fff;
-  padding: 20px;
-  border-radius: 10px;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-  width: 100%;
-  max-width: 400px;
-`
-
-const UserDataField = styled.p`
-  font-size: 14px;
-  color: #555;
-  margin-bottom: 10px;
-`

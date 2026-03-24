@@ -1,0 +1,38 @@
+export const sampleProducts = [
+  {
+    name: 'Everyday Canvas Tote',
+    description: 'A roomy tote bag for market runs, office commutes, and weekend trips.',
+    price: 39,
+    images: ['https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=900&q=80'],
+    stock: 14,
+    category: 'Bags',
+    featured: true,
+  },
+  {
+    name: 'Minimal Desk Lamp',
+    description: 'Soft ambient light with a clean silhouette that fits modern rooms.',
+    price: 64,
+    images: ['https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=900&q=80'],
+    stock: 9,
+    category: 'Home',
+    featured: true,
+  },
+  {
+    name: 'Cloud Runner Sneakers',
+    description: 'Breathable daily sneakers with a light foam sole and neutral palette.',
+    price: 89,
+    images: ['https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=900&q=80'],
+    stock: 18,
+    category: 'Shoes',
+    featured: false,
+  },
+  {
+    name: 'Stoneware Mug Set',
+    description: 'Hand-finished mugs designed for slow mornings and warm drinks.',
+    price: 28,
+    images: ['https://images.unsplash.com/photo-1514228742587-6b1558fcf93a?auto=format&fit=crop&w=900&q=80'],
+    stock: 24,
+    category: 'Kitchen',
+    featured: false,
+  },
+]

@@ -29,6 +29,7 @@ async function dbConnect(): Promise<mongoose.Connection> {
   if (!cached.promise) {
     const opts = {
       bufferCommands: false,
+      serverSelectionTimeoutMS: 5000,
     }
     cached.promise = mongoose.connect(mongoUri, opts).then((mongoose) => {
       return mongoose.connection

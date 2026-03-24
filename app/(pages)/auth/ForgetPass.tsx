@@ -1,82 +1,63 @@
 'use client'
 
-import { Gaitwise } from '@/public/svg'
-import Image from 'next/image'
+import Link from 'next/link'
 import { useState } from 'react'
-import styled from 'styled-components'
+import AuthShell from '@/components/AuthShell'
 
 export default function ForgetPassword() {
   const [email, setEmail] = useState('')
+  const [message, setMessage] = useState('')
+  const [isError, setIsError] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
 
   const handleSendCode = async () => {
-    const res = await fetch('/api/forgot-password', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ email }),
-    })
+    try {
+      setIsLoading(true)
+      setMessage('')
+      setIsError(false)
 
-    if (res.ok) {
-      alert('確認コードが送信されました')
-    } else {
-      alert('コードの送信に失敗しました')
+      if (!email.trim()) {
+        setIsError(true)
+        setMessage('Please enter your email address first.')
+        return
+      }
+
+      setMessage('Demo mode: password reset email sending is not connected yet.')
+    } catch {
+      setIsError(true)
+      setMessage('Could not process the request.')
+    } finally {
+      setIsLoading(false)
     }
   }
 
   return (
-    <ForgetPasswordBox>
-      <Image src={Gaitwise} alt="logo" width={100} height={100} layout="responsive" />
-      <Title>비밀번호를 잊어버리셨나요?</Title>
-      <Subtitle>이메일 주소를 입력해 주세요. 확인 코드를 보내드립니다.</Subtitle>
+    <AuthShell
+      title="Forgot your password?"
+      subtitle="Enter your email and we will simulate the reset flow for now."
+      footer={
+        <Link href="/auth?type=login" className="font-semibold text-[#1d3124] underline underline-offset-4">
+          Back to login
+        </Link>
+      }
+    >
+      <input
+        type="email"
+        placeholder="Your email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        className="w-full rounded-2xl border border-black/10 bg-[#f9f7f2] px-4 py-3 outline-none transition focus:border-[#68806f]"
+      />
 
-      <InputField type="email" placeholder="이메일 입력" value={email} onChange={(e) => setEmail(e.target.value)} />
+      <button
+        onClick={handleSendCode}
+        disabled={isLoading}
+        className="w-full rounded-full bg-[#1d3124] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#294532] disabled:cursor-wait disabled:opacity-60"
+      >
+        {isLoading ? 'Sending...' : 'Send reset link'}
+      </button>
 
-      <SendCodeButton onClick={handleSendCode}>Send code</SendCodeButton>
-    </ForgetPasswordBox>
+      {message && <p className={`text-center text-sm ${isError ? 'text-[#b23a3a]' : 'text-[#2f6d43]'}`}>{message}</p>}
+    </AuthShell>
   )
 }
-
-const ForgetPasswordBox = styled.div`
-  background: white;
-  padding: 2rem;
-  border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-  text-align: center;
-  width: 350px;
-`
-
-const Title = styled.h2`
-  font-size: 1.5rem;
-  margin-bottom: 0.5rem;
-`
-
-const Subtitle = styled.p`
-  color: #666;
-  margin-bottom: 1.5rem;
-`
-
-const InputField = styled.input`
-  width: 100%;
-  padding: 0.75rem;
-  margin-bottom: 1rem;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  font-size: 1rem;
-  background-color: #f9f9f9;
-`
-
-const SendCodeButton = styled.button`
-  width: 100%;
-  padding: 0.75rem;
-  background-color: #2d3748;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 1rem;
-
-  &:hover {
-    background-color: #1a202c;
-  }
-`
