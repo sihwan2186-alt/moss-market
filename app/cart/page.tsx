@@ -2,8 +2,11 @@
 
 import Image from 'next/image'
 import Link from 'next/link'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useLanguage } from '@/components/LanguageProvider'
 import StoreHeader from '@/components/StoreHeader'
+import { dispatchCartUpdated } from '@/lib/cart-events'
+import { translateProductName } from '@/lib/sample-products'
 
 type CartItem = {
   productId: string
@@ -11,10 +14,12 @@ type CartItem = {
   name: string
   image: string
   price: number
+  stock: number
   subtotal: number
 }
 
 export default function CartPage() {
+  const { locale, messages: t } = useLanguage()
   const [items, setItems] = useState<CartItem[]>([])
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(true)
@@ -30,14 +35,14 @@ export default function CartPage() {
 
   const totalPrice = useMemo(() => items.reduce((sum, item) => sum + item.subtotal, 0), [items])
 
-  const loadCart = async () => {
+  const loadCart = useCallback(async () => {
     try {
       setLoading(true)
       const response = await fetch('/api/cart', { cache: 'no-store' })
       const data = await response.json()
 
       if (!response.ok) {
-        setMessage(data.message ?? 'Could not load cart.')
+        setMessage(data.message ?? t.cart.loadFailed)
         setItems([])
         setNeedsLogin(response.status === 401)
         return
@@ -48,11 +53,11 @@ export default function CartPage() {
       setNeedsLogin(false)
       setMode(data.mode === 'local-fallback' ? 'local-fallback' : 'database')
     } catch {
-      setMessage('Could not load cart.')
+      setMessage(t.cart.loadFailed)
     } finally {
       setLoading(false)
     }
-  }
+  }, [t.cart.loadFailed])
 
   const updateQuantity = async (productId: string, nextQuantity: number) => {
     try {
@@ -64,12 +69,13 @@ export default function CartPage() {
         body: JSON.stringify({ productId, quantity: nextQuantity }),
       })
       const data = await response.json()
-      setMessage(data.message ?? (response.ok ? 'Cart updated.' : 'Could not update cart.'))
+      setMessage(data.message ?? (response.ok ? t.cart.updated : t.cart.updateFailed))
       if (response.ok) {
+        dispatchCartUpdated()
         await loadCart()
       }
     } catch {
-      setMessage('Could not update cart.')
+      setMessage(t.cart.updateFailed)
     }
   }
 
@@ -77,12 +83,13 @@ export default function CartPage() {
     try {
       const response = await fetch(`/api/cart?productId=${productId}`, { method: 'DELETE' })
       const data = await response.json()
-      setMessage(data.message ?? (response.ok ? 'Item removed.' : 'Could not remove item.'))
+      setMessage(data.message ?? (response.ok ? t.cart.removed : t.cart.removeFailed))
       if (response.ok) {
+        dispatchCartUpdated()
         await loadCart()
       }
     } catch {
-      setMessage('Could not remove item.')
+      setMessage(t.cart.removeFailed)
     }
   }
 
@@ -91,16 +98,17 @@ export default function CartPage() {
       setOrdering(true)
       const response = await fetch('/api/orders', { method: 'POST' })
       const data = await response.json()
-      setMessage(data.message ?? (response.ok ? 'Order placed.' : 'Checkout failed.'))
+      setMessage(data.message ?? (response.ok ? t.cart.orderPlaced : t.cart.checkoutFailed))
 
       if (response.ok) {
         setLastOrderId(data.orderId ?? '')
         setMode(data.mode === 'local-fallback' ? 'local-fallback' : 'database')
         setPaymentOpen(false)
+        dispatchCartUpdated()
         await loadCart()
       }
     } catch {
-      setMessage('Checkout failed.')
+      setMessage(t.cart.checkoutFailed)
     } finally {
       setOrdering(false)
     }
@@ -108,7 +116,7 @@ export default function CartPage() {
 
   const handleFakePayment = async () => {
     if (!paymentName || !paymentNumber || !paymentExpiry || !paymentCvc) {
-      setMessage('Fill out the test payment form first.')
+      setMessage(t.cart.fillPaymentForm)
       return
     }
 
@@ -117,65 +125,67 @@ export default function CartPage() {
 
   useEffect(() => {
     void loadCart()
-  }, [])
+  }, [loadCart])
 
   return (
     <div className="min-h-screen bg-[#f7f1e8] text-[#18261d]">
-      <StoreHeader cartCount={items.length} />
+      <StoreHeader />
       <main className="mx-auto max-w-5xl px-6 py-10">
         <div className="mb-8 flex items-end justify-between gap-4">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-[#68806f]">Cart</p>
-            <h1 className="mt-2 text-4xl font-black tracking-tight">Your selected items</h1>
+            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-[#68806f]">{t.cart.eyebrow}</p>
+            <h1 className="mt-2 text-4xl font-black tracking-tight">{t.cart.title}</h1>
           </div>
           <a href="/" className="text-sm font-semibold text-[#1d3124] underline underline-offset-4">
-            Continue shopping
+            {t.cart.continueShopping}
           </a>
         </div>
 
         {mode === 'local-fallback' && !needsLogin && (
           <div className="mb-6 rounded-[24px] border border-[#d6c5ae] bg-[#fff5e7] p-5 text-sm text-[#6d5641]">
-            MongoDB is currently unavailable, so cart and order data are being stored in local fallback mode.
+            {t.cart.fallbackNotice}
           </div>
         )}
 
         {needsLogin && (
           <div className="mb-6 rounded-[24px] border border-[#d6c5ae] bg-[#fff5e7] p-5 text-sm text-[#6d5641]">
-            You need to log in before using the cart.
+            {t.cart.needsLogin}
             <a href="/auth?type=login" className="ml-2 font-semibold underline underline-offset-4">
-              Go to login
+              {t.header.login}
             </a>
           </div>
         )}
 
         {lastOrderId && (
           <div className="mb-6 rounded-[24px] border border-[#c9dfcb] bg-[#edf8ee] p-5 text-sm text-[#2f5b39]">
-            Order created successfully.
-            <span className="ml-2 font-semibold">Reference: {lastOrderId}</span>
+            {t.cart.orderCreated}
+            <span className="ml-2 font-semibold">
+              {t.cart.reference}: {lastOrderId}
+            </span>
             <a href="/orders" className="ml-3 font-semibold underline underline-offset-4">
-              View orders
+              {t.cart.viewOrders}
             </a>
           </div>
         )}
 
         <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
           <section className="space-y-4 rounded-[28px] bg-white p-6 shadow-[0_18px_60px_rgba(17,24,39,0.08)]">
-            {loading && <p>Loading cart...</p>}
-            {!loading && !needsLogin && items.length === 0 && (
-              <p className="text-[#5d6a61]">Your cart is empty for now.</p>
-            )}
+            {loading && <p>{t.cart.loading}</p>}
+            {!loading && !needsLogin && items.length === 0 && <p className="text-[#5d6a61]">{t.cart.empty}</p>}
             {items.map((item) => (
               <article key={item.productId} className="flex gap-4 border-b border-black/5 pb-4 last:border-0">
                 <Image
                   src={item.image}
-                  alt={item.name}
+                  alt={translateProductName(item.name, locale)}
                   width={96}
                   height={96}
                   className="h-24 w-24 rounded-2xl object-cover"
                 />
                 <div className="flex-1">
-                  <h2 className="text-lg font-bold">{item.name}</h2>
-                  <p className="mt-3 text-sm text-[#5d6a61]">${item.price} each</p>
+                  <h2 className="text-lg font-bold">{translateProductName(item.name, locale)}</h2>
+                  <p className="mt-3 text-sm text-[#5d6a61]">
+                    ${item.price} {t.cart.each}
+                  </p>
                   <div className="mt-3 flex items-center gap-3">
                     <button
                       onClick={() => item.quantity > 1 && void updateQuantity(item.productId, item.quantity - 1)}
@@ -186,6 +196,7 @@ export default function CartPage() {
                     <span className="min-w-8 text-center text-sm font-semibold">{item.quantity}</span>
                     <button
                       onClick={() => void updateQuantity(item.productId, item.quantity + 1)}
+                      disabled={item.quantity >= item.stock}
                       className="h-8 w-8 rounded-full border border-black/10 text-sm font-bold"
                     >
                       +
@@ -194,7 +205,7 @@ export default function CartPage() {
                       onClick={() => void removeItem(item.productId)}
                       className="ml-3 text-sm font-semibold text-[#8b2d2d] underline underline-offset-4"
                     >
-                      Remove
+                      {t.cart.remove}
                     </button>
                   </div>
                 </div>
@@ -204,9 +215,9 @@ export default function CartPage() {
           </section>
 
           <aside className="rounded-[28px] bg-[#203126] p-6 text-[#f5efe3] shadow-[0_18px_60px_rgba(17,24,39,0.12)]">
-            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-[#b8c9bc]">Summary</p>
+            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-[#b8c9bc]">{t.cart.summary}</p>
             <div className="mt-6 flex items-center justify-between text-lg">
-              <span>Total</span>
+              <span>{t.cart.total}</span>
               <strong>${totalPrice}</strong>
             </div>
             <button
@@ -214,7 +225,7 @@ export default function CartPage() {
               disabled={items.length === 0 || needsLogin}
               className="mt-6 w-full rounded-full bg-[#f0e7d8] px-5 py-3 text-sm font-semibold text-[#18261d] disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Open test payment
+              {t.cart.openTestPayment}
             </button>
             <Link
               href="/checkout"
@@ -222,11 +233,9 @@ export default function CartPage() {
                 items.length === 0 || needsLogin ? 'pointer-events-none opacity-40' : ''
               }`}
             >
-              Go to purchase page
+              {t.cart.purchasePage}
             </Link>
-            <p className="mt-3 text-xs text-[#c7d5cb]">
-              This opens a demo payment form only. No real payment is processed.
-            </p>
+            <p className="mt-3 text-xs text-[#c7d5cb]">{t.cart.demoNote}</p>
             {message && <p className="mt-4 text-sm text-[#d6f4de]">{message}</p>}
           </aside>
         </div>
@@ -237,17 +246,17 @@ export default function CartPage() {
           <div className="w-full max-w-md rounded-[28px] bg-white p-6 shadow-2xl">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.3em] text-[#68806f]">Demo checkout</p>
-                <h2 className="mt-2 text-2xl font-black text-[#18261d]">Test payment window</h2>
+                <p className="text-sm font-semibold uppercase tracking-[0.3em] text-[#68806f]">{t.cart.demoCheckout}</p>
+                <h2 className="mt-2 text-2xl font-black text-[#18261d]">{t.cart.testPaymentWindow}</h2>
               </div>
               <button onClick={() => setPaymentOpen(false)} className="text-sm font-semibold text-[#68806f]">
-                Close
+                {t.cart.close}
               </button>
             </div>
 
             <div className="mt-6 space-y-4">
               <label className="block">
-                <span className="mb-2 block text-sm font-semibold text-[#314338]">Cardholder</span>
+                <span className="mb-2 block text-sm font-semibold text-[#314338]">{t.cart.cardholder}</span>
                 <input
                   value={paymentName}
                   onChange={(e) => setPaymentName(e.target.value)}
@@ -255,7 +264,7 @@ export default function CartPage() {
                 />
               </label>
               <label className="block">
-                <span className="mb-2 block text-sm font-semibold text-[#314338]">Card number</span>
+                <span className="mb-2 block text-sm font-semibold text-[#314338]">{t.cart.cardNumber}</span>
                 <input
                   value={paymentNumber}
                   onChange={(e) => setPaymentNumber(e.target.value)}
@@ -264,7 +273,7 @@ export default function CartPage() {
               </label>
               <div className="grid grid-cols-2 gap-4">
                 <label className="block">
-                  <span className="mb-2 block text-sm font-semibold text-[#314338]">Expiry</span>
+                  <span className="mb-2 block text-sm font-semibold text-[#314338]">{t.cart.expiry}</span>
                   <input
                     value={paymentExpiry}
                     onChange={(e) => setPaymentExpiry(e.target.value)}
@@ -272,7 +281,7 @@ export default function CartPage() {
                   />
                 </label>
                 <label className="block">
-                  <span className="mb-2 block text-sm font-semibold text-[#314338]">CVC</span>
+                  <span className="mb-2 block text-sm font-semibold text-[#314338]">{t.cart.cvc}</span>
                   <input
                     value={paymentCvc}
                     onChange={(e) => setPaymentCvc(e.target.value)}
@@ -284,12 +293,10 @@ export default function CartPage() {
 
             <div className="mt-6 rounded-[24px] bg-[#f7f1e8] p-4 text-sm text-[#314338]">
               <div className="flex items-center justify-between">
-                <span>Demo payment total</span>
+                <span>{t.cart.demoPaymentTotal}</span>
                 <strong>${totalPrice}</strong>
               </div>
-              <p className="mt-2 text-xs text-[#68806f]">
-                Press confirm to simulate a successful payment and create an order.
-              </p>
+              <p className="mt-2 text-xs text-[#68806f]">{t.cart.confirmTip}</p>
             </div>
 
             <button
@@ -297,7 +304,7 @@ export default function CartPage() {
               disabled={ordering}
               className="mt-6 w-full rounded-full bg-[#1d3124] px-5 py-3 text-sm font-semibold text-white disabled:cursor-wait disabled:opacity-60"
             >
-              {ordering ? 'Simulating payment...' : 'Confirm test payment'}
+              {ordering ? t.cart.simulatingPayment : t.cart.confirmTestPayment}
             </button>
           </div>
         </div>

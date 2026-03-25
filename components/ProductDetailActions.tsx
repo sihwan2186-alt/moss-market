@@ -2,6 +2,9 @@
 
 import Link from 'next/link'
 import { useState } from 'react'
+import RestockAlertForm from '@/components/RestockAlertForm'
+import { useLanguage } from '@/components/LanguageProvider'
+import { dispatchCartUpdated } from '@/lib/cart-events'
 
 type ProductDetailActionsProps = {
   productId: string
@@ -9,13 +12,14 @@ type ProductDetailActionsProps = {
 }
 
 export default function ProductDetailActions({ productId, stock }: ProductDetailActionsProps) {
+  const { messages: t } = useLanguage()
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)
   const isOutOfStock = stock <= 0
 
   const addToCart = async () => {
     if (isOutOfStock) {
-      setMessage('This item is currently out of stock.')
+      setMessage(t.productDetailActions.outOfStock)
       return
     }
 
@@ -32,9 +36,15 @@ export default function ProductDetailActions({ productId, stock }: ProductDetail
       })
 
       const data = await response.json()
-      setMessage(data.message ?? (response.ok ? 'Added to cart.' : 'Could not add to cart.'))
+      if (response.ok) {
+        dispatchCartUpdated()
+        setMessage(t.productDetailActions.addedToCart)
+        return
+      }
+
+      setMessage(data.message ?? t.productDetailActions.addFailed)
     } catch {
-      setMessage('Request failed.')
+      setMessage(t.productDetailActions.requestFailed)
     } finally {
       setLoading(false)
     }
@@ -47,16 +57,21 @@ export default function ProductDetailActions({ productId, stock }: ProductDetail
           href="/cart"
           className="rounded-full border border-[#1d3124] px-6 py-3 text-sm font-semibold text-[#1d3124]"
         >
-          Open cart
+          {t.productDetailActions.openCart}
         </Link>
         <button
           onClick={addToCart}
           disabled={loading || isOutOfStock}
           className="rounded-full bg-[#1d3124] px-6 py-3 text-sm font-semibold text-white disabled:cursor-wait disabled:opacity-60"
         >
-          {isOutOfStock ? 'Sold out' : loading ? 'Adding...' : 'Add to cart'}
+          {isOutOfStock
+            ? t.productDetailActions.soldOut
+            : loading
+              ? t.productDetailActions.adding
+              : t.productDetailActions.addToCart}
         </button>
       </div>
+      {isOutOfStock && <RestockAlertForm productId={productId} />}
       {message && <p className={`text-sm ${isOutOfStock ? 'text-[#8b2d2d]' : 'text-[#2f6d43]'}`}>{message}</p>}
     </div>
   )

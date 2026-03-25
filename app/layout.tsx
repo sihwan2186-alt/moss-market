@@ -1,5 +1,9 @@
 import type { Metadata } from 'next'
+import { cookies, headers } from 'next/headers'
 import localFont from 'next/font/local'
+import { CartProvider } from '@/components/CartProvider'
+import { LanguageProvider } from '@/components/LanguageProvider'
+import { detectLocale } from '@/lib/i18n'
 import './globals.css'
 
 const geistSans = localFont({
@@ -29,9 +33,18 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  const locale = detectLocale(cookies().get('locale')?.value, headers().get('accept-language'))
+
   return (
-    <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>{children}</body>
+    <html lang={locale} translate="no">
+      <head>
+        <meta name="google" content="notranslate" />
+      </head>
+      <body className={`notranslate ${geistSans.variable} ${geistMono.variable} antialiased`}>
+        <LanguageProvider initialLocale={locale}>
+          <CartProvider>{children}</CartProvider>
+        </LanguageProvider>
+      </body>
     </html>
   )
 }

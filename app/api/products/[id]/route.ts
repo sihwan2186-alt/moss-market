@@ -64,6 +64,12 @@ function normalizeProductBody(body: ProductBody): { data?: NormalizedProductInpu
     }
   }
 
+  if (images.length === 0) {
+    return {
+      message: 'At least one image URL is required.',
+    }
+  }
+
   if (!Number.isFinite(stock) || stock < 0) {
     return {
       message: 'Stock must be 0 or higher.',
