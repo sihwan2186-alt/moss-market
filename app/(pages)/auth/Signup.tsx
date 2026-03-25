@@ -3,9 +3,11 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
+import { useLanguage } from '@/components/LanguageProvider'
 import AuthShell from '@/components/AuthShell'
 
 export default function SignUp() {
+  const { messages: t } = useLanguage()
   const router = useRouter()
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -34,13 +36,13 @@ export default function SignUp() {
 
       if (!res.ok) {
         setIsError(true)
-        setMessage(data.message ?? 'Sign up failed.')
+        setMessage(data.message ?? t.signup.signUpFailed)
         setHint(data.hint ?? '')
         return
       }
 
-      setMessage(data.message ?? 'Account created successfully.')
-      setHint(data.mode === 'local-fallback' ? 'Saved in local fallback mode because MongoDB is unavailable.' : '')
+      setMessage(data.message ?? t.signup.accountCreated)
+      setHint(data.mode === 'local-fallback' ? t.signup.fallbackHint : '')
       setName('')
       setEmail('')
       setPassword('')
@@ -51,7 +53,7 @@ export default function SignUp() {
       }, 700)
     } catch {
       setIsError(true)
-      setMessage('Unable to reach the server.')
+      setMessage(t.signup.unableToReachServer)
       setHint('')
     } finally {
       setIsLoading(false)
@@ -60,31 +62,31 @@ export default function SignUp() {
 
   return (
     <AuthShell
-      title="Create account"
-      subtitle="Create your customer account to start shopping."
+      title={t.signup.title}
+      subtitle={t.signup.subtitle}
       footer={
         <Link href="/auth?type=login" className="font-semibold text-[#1d3124] underline underline-offset-4">
-          Already have an account? Sign in
+          {t.signup.alreadyHaveAccount}
         </Link>
       }
     >
       <input
         type="text"
-        placeholder="Name"
+        placeholder={t.signup.namePlaceholder}
         value={name}
         onChange={(e) => setName(e.target.value)}
         className="w-full rounded-2xl border border-black/10 bg-[#f9f7f2] px-4 py-3 outline-none transition focus:border-[#68806f]"
       />
       <input
         type="email"
-        placeholder="Email"
+        placeholder={t.signup.emailPlaceholder}
         value={email}
         onChange={(e) => setEmail(e.target.value)}
         className="w-full rounded-2xl border border-black/10 bg-[#f9f7f2] px-4 py-3 outline-none transition focus:border-[#68806f]"
       />
       <input
         type="password"
-        placeholder="Password (min 8 chars)"
+        placeholder={t.signup.passwordPlaceholder}
         value={password}
         onChange={(e) => setPassword(e.target.value)}
         className="w-full rounded-2xl border border-black/10 bg-[#f9f7f2] px-4 py-3 outline-none transition focus:border-[#68806f]"
@@ -95,7 +97,7 @@ export default function SignUp() {
         disabled={isLoading}
         className="w-full rounded-full bg-[#1d3124] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#294532] disabled:cursor-wait disabled:opacity-60"
       >
-        {isLoading ? 'Creating account...' : 'Sign up'}
+        {isLoading ? t.signup.creatingAccount : t.signup.signUp}
       </button>
 
       {message && <p className={`text-center text-sm ${isError ? 'text-[#b23a3a]' : 'text-[#2f6d43]'}`}>{message}</p>}

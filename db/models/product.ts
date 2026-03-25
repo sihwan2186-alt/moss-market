@@ -1,6 +1,7 @@
 import mongoose, { Model, Schema } from 'mongoose'
 
 export interface IProduct {
+  seedKey?: string
   name: string
   description: string
   price: number
@@ -14,6 +15,7 @@ export interface IProduct {
 
 const ProductSchema = new Schema<IProduct>(
   {
+    seedKey: { type: String, trim: true, unique: true, sparse: true },
     name: { type: String, required: true, trim: true },
     description: { type: String, required: true, trim: true },
     price: { type: Number, required: true, min: 0 },

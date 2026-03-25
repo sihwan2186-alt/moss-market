@@ -1,14 +1,17 @@
 'use client'
 
+import type { FormEvent } from 'react'
 import { Suspense, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { signIn } from 'next-auth/react'
+import { useLanguage } from '@/components/LanguageProvider'
 import AuthShell from '@/components/AuthShell'
 import ForgetPassword from './ForgetPass'
 import SignUp from './Signup'
 
 function AuthContent() {
+  const { messages: t } = useLanguage()
   const router = useRouter()
   const searchParams = useSearchParams()
   const type = searchParams.get('type')
@@ -33,11 +36,11 @@ function AuthContent() {
 
       if (!result?.ok) {
         setIsError(true)
-        setMessage('Login failed. Please check your email and password.')
+        setMessage(t.auth.loginFailed)
         return
       }
 
-      setMessage('Login successful.')
+      setMessage(t.auth.loginSuccess)
       setEmail('')
       setPassword('')
 
@@ -47,10 +50,15 @@ function AuthContent() {
       }, 400)
     } catch {
       setIsError(true)
-      setMessage('Unable to reach the server.')
+      setMessage(t.auth.unableToReachServer)
     } finally {
       setIsLoading(false)
     }
+  }
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    await handleLogin()
   }
 
   if (type === 'sign-up') {
@@ -63,53 +71,57 @@ function AuthContent() {
 
   return (
     <AuthShell
-      title="Login"
-      subtitle="Sign in to your customer account."
+      title={t.auth.loginTitle}
+      subtitle={t.auth.loginSubtitle}
       footer={
         <>
           <Link href="/auth?type=forgetpass" className="font-semibold text-[#1d3124] underline underline-offset-4">
-            Forgot password?
+            {t.auth.forgotPassword}
           </Link>
           <p className="mt-3">
-            Need an account?{' '}
+            {t.auth.needAccount}{' '}
             <Link href="/auth?type=sign-up" className="font-semibold text-[#1d3124] underline underline-offset-4">
-              Sign up
+              {t.auth.signUp}
             </Link>
           </p>
         </>
       }
     >
-      <input
-        type="email"
-        placeholder="Email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        className="w-full rounded-2xl border border-black/10 bg-[#f9f7f2] px-4 py-3 outline-none transition focus:border-[#68806f]"
-      />
-      <input
-        type="password"
-        placeholder="Password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        className="w-full rounded-2xl border border-black/10 bg-[#f9f7f2] px-4 py-3 outline-none transition focus:border-[#68806f]"
-      />
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <input
+          type="email"
+          placeholder={t.auth.emailPlaceholder}
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className="w-full rounded-2xl border border-black/10 bg-[#f9f7f2] px-4 py-3 outline-none transition focus:border-[#68806f]"
+        />
+        <input
+          type="password"
+          placeholder={t.auth.passwordPlaceholder}
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          className="w-full rounded-2xl border border-black/10 bg-[#f9f7f2] px-4 py-3 outline-none transition focus:border-[#68806f]"
+        />
 
-      <button
-        onClick={handleLogin}
-        disabled={isLoading}
-        className="w-full rounded-full bg-[#1d3124] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#294532] disabled:cursor-wait disabled:opacity-60"
-      >
-        {isLoading ? 'Signing in...' : 'Login'}
-      </button>
+        <button
+          type="submit"
+          disabled={isLoading}
+          className="w-full rounded-full bg-[#1d3124] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#294532] disabled:cursor-wait disabled:opacity-60"
+        >
+          {isLoading ? t.auth.signingIn : t.auth.login}
+        </button>
 
-      {message && <p className={`text-center text-sm ${isError ? 'text-[#b23a3a]' : 'text-[#2f6d43]'}`}>{message}</p>}
+        {message && <p className={`text-center text-sm ${isError ? 'text-[#b23a3a]' : 'text-[#2f6d43]'}`}>{message}</p>}
+      </form>
     </AuthShell>
   )
 }
 
 export default function AuthPage() {
+  const { messages: t } = useLanguage()
+
   return (
-    <Suspense fallback={<div className="p-8 text-center text-sm text-[#5d6a61]">Loading...</div>}>
+    <Suspense fallback={<div className="p-8 text-center text-sm text-[#5d6a61]">{t.auth.loading}</div>}>
       <AuthContent />
     </Suspense>
   )

@@ -1,3 +1,7 @@
+'use client'
+
+import { useLanguage } from '@/components/LanguageProvider'
+
 type OrderStatusBadgeProps = {
   status: string
 }
@@ -8,15 +12,10 @@ const statusStyles: Record<string, string> = {
   cancelled: 'bg-[#fde8e8] text-[#9a2f2f]',
 }
 
-const statusLabels: Record<string, string> = {
-  paid: 'Paid',
-  pending: 'Pending',
-  cancelled: 'Cancelled',
-}
-
 export default function OrderStatusBadge({ status }: OrderStatusBadgeProps) {
+  const { messages: t } = useLanguage()
   const normalizedStatus = status.toLowerCase()
-  const label = statusLabels[normalizedStatus] ?? status
+  const label = t.common.orderStatuses[normalizedStatus as keyof typeof t.common.orderStatuses] ?? status
   const style = statusStyles[normalizedStatus] ?? 'bg-[#edf1ec] text-[#425247]'
 
   return (

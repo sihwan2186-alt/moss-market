@@ -34,7 +34,9 @@ export const authOptions: NextAuthOptions = {
           return null
         }
 
-        const email = String(credentials.email ?? '').trim().toLowerCase()
+        const email = String(credentials.email ?? '')
+          .trim()
+          .toLowerCase()
         const password = String(credentials.password ?? '').trim()
 
         if (!email || !password) {
