@@ -37,3 +37,11 @@ export function signAuthToken(payload: { userId: string; email: string; role: st
 
   return jwt.sign(payload, secret, { expiresIn: '7d' })
 }
+
+export function createSecureToken() {
+  return crypto.randomBytes(32).toString('hex')
+}
+
+export function hashToken(token: string) {
+  return crypto.createHash('sha256').update(token).digest('hex')
+}
