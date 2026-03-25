@@ -12,8 +12,20 @@ export type LocalUser = {
   updatedAt: string
 }
 
+export type LocalPasswordResetToken = {
+  id: string
+  userId: string
+  email: string
+  tokenHash: string
+  expiresAt: string
+  usedAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
 const dataDir = path.join(process.cwd(), 'data')
 const usersFile = path.join(dataDir, 'users.json')
+const resetTokensFile = path.join(dataDir, 'password-reset-tokens.json')
 
 async function ensureStore() {
   await fs.mkdir(dataDir, { recursive: true })
@@ -22,6 +34,12 @@ async function ensureStore() {
     await fs.access(usersFile)
   } catch {
     await fs.writeFile(usersFile, '[]', 'utf8')
+  }
+
+  try {
+    await fs.access(resetTokensFile)
+  } catch {
+    await fs.writeFile(resetTokensFile, '[]', 'utf8')
   }
 }
 
@@ -61,4 +79,79 @@ export async function createLocalUser(input: Omit<LocalUser, 'id' | 'createdAt' 
   await fs.writeFile(usersFile, JSON.stringify(users, null, 2), 'utf8')
 
   return user
+}
+
+export async function updateLocalUserPassword(userId: string, passwordHash: string) {
+  const users = await readLocalUsers()
+  const user = users.find((entry) => entry.id === userId)
+
+  if (!user) {
+    return null
+  }
+
+  user.passwordHash = passwordHash
+  user.updatedAt = new Date().toISOString()
+  await fs.writeFile(usersFile, JSON.stringify(users, null, 2), 'utf8')
+
+  return user
+}
+
+export async function readLocalPasswordResetTokens() {
+  await ensureStore()
+  const raw = await fs.readFile(resetTokensFile, 'utf8')
+
+  try {
+    return JSON.parse(raw) as LocalPasswordResetToken[]
+  } catch {
+    return []
+  }
+}
+
+export async function createLocalPasswordResetToken(
+  input: Pick<LocalPasswordResetToken, 'userId' | 'email' | 'tokenHash' | 'expiresAt'>
+) {
+  const tokens = await readLocalPasswordResetTokens()
+  const now = new Date().toISOString()
+  const nextTokens = tokens.map((token) =>
+    token.userId === input.userId && token.usedAt === null ? { ...token, usedAt: now, updatedAt: now } : token
+  )
+
+  const token: LocalPasswordResetToken = {
+    id: crypto.randomUUID(),
+    usedAt: null,
+    createdAt: now,
+    updatedAt: now,
+    ...input,
+  }
+
+  nextTokens.unshift(token)
+  await fs.writeFile(resetTokensFile, JSON.stringify(nextTokens, null, 2), 'utf8')
+
+  return token
+}
+
+export async function findLocalPasswordResetTokenByHash(tokenHash: string) {
+  const tokens = await readLocalPasswordResetTokens()
+  const now = Date.now()
+
+  return (
+    tokens.find(
+      (token) => token.tokenHash === tokenHash && token.usedAt === null && new Date(token.expiresAt).getTime() > now
+    ) ?? null
+  )
+}
+
+export async function markLocalPasswordResetTokenUsed(tokenId: string) {
+  const tokens = await readLocalPasswordResetTokens()
+  const token = tokens.find((entry) => entry.id === tokenId)
+
+  if (!token) {
+    return null
+  }
+
+  token.usedAt = new Date().toISOString()
+  token.updatedAt = token.usedAt
+  await fs.writeFile(resetTokensFile, JSON.stringify(tokens, null, 2), 'utf8')
+
+  return token
 }

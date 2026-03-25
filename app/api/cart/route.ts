@@ -12,6 +12,18 @@ import {
 } from '@/lib/dev-store'
 import { getAuthUser } from '@/lib/session'
 
+type AddToCartBody = {
+  productId?: string
+  quantity?: number
+}
+
+type UpdateCartBody = {
+  productId?: string
+  quantity?: number
+}
+
+const FALLBACK_PRODUCT_LOOKUP = 'FALLBACK_PRODUCT_LOOKUP'
+
 function isConnectionError(message: string) {
   return (
     message.includes('querySrv') ||
@@ -19,6 +31,16 @@ function isConnectionError(message: string) {
     message.includes('ENOTFOUND') ||
     message.includes('buffering timed out')
   )
+}
+
+function normalizeQuantity(quantity?: number, fallback = 1) {
+  const numericQuantity = Number(quantity)
+
+  if (!Number.isFinite(numericQuantity) || numericQuantity < 1) {
+    return fallback
+  }
+
+  return Math.floor(numericQuantity)
 }
 
 export async function GET() {
@@ -44,12 +66,14 @@ export async function GET() {
     const items = cart.items.map((item) => {
       const product = productMap.get(item.productId.toString())
       const price = product?.price ?? 0
+
       return {
-        productId: item.productId,
+        productId: item.productId.toString(),
         quantity: item.quantity,
         name: product?.name ?? 'Unknown product',
         image: product?.images?.[0] ?? '',
         price,
+        stock: product?.stock ?? 0,
         subtotal: price * item.quantity,
       }
     })
@@ -78,6 +102,7 @@ export async function GET() {
           name: product?.name ?? 'Unknown product',
           image: product?.images?.[0] ?? '',
           price,
+          stock: product?.stock ?? 0,
           subtotal: price * item.quantity,
         }
       }) ?? []
@@ -85,11 +110,6 @@ export async function GET() {
 
     return NextResponse.json({ items, totalPrice, mode: 'local-fallback' }, { status: 200 })
   }
-}
-
-type AddToCartBody = {
-  productId?: string
-  quantity?: number
 }
 
 export async function POST(request: NextRequest) {
@@ -105,11 +125,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: 'A valid productId is required.' }, { status: 400 })
   }
 
-  const quantity = body.quantity && body.quantity > 0 ? body.quantity : 1
+  const quantity = normalizeQuantity(body.quantity)
 
   try {
-    if (!body.productId || !mongoose.Types.ObjectId.isValid(body.productId)) {
-      return NextResponse.json({ message: 'A valid productId is required.' }, { status: 400 })
+    if (!mongoose.Types.ObjectId.isValid(body.productId)) {
+      throw new Error(FALLBACK_PRODUCT_LOOKUP)
     }
 
     await dbConnect()
@@ -121,6 +141,11 @@ export async function POST(request: NextRequest) {
     }
 
     let cart = await Cart.findOne({ userId: authUser.userId })
+    const existingQuantity = cart?.items.find((item) => item.productId.toString() === body.productId)?.quantity ?? 0
+
+    if (existingQuantity + quantity > product.stock) {
+      return NextResponse.json({ message: 'Not enough stock is available for this item.' }, { status: 400 })
+    }
 
     if (!cart) {
       cart = await Cart.create({
@@ -143,7 +168,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown add to cart error'
 
-    if (!isConnectionError(message)) {
+    if (message !== FALLBACK_PRODUCT_LOOKUP && !isConnectionError(message)) {
       return NextResponse.json({ message: 'Failed to update cart.', error: message }, { status: 500 })
     }
 
@@ -160,6 +185,11 @@ export async function POST(request: NextRequest) {
     }
 
     const existingItem = cart.items.find((item) => item.productId === body.productId)
+    const existingQuantity = existingItem?.quantity ?? 0
+
+    if (existingQuantity + quantity > product.stock) {
+      return NextResponse.json({ message: 'Not enough stock is available for this item.' }, { status: 400 })
+    }
 
     if (existingItem) {
       existingItem.quantity += quantity
@@ -177,11 +207,6 @@ export async function POST(request: NextRequest) {
   }
 }
 
-type UpdateCartBody = {
-  productId?: string
-  quantity?: number
-}
-
 export async function PATCH(request: NextRequest) {
   const authUser = await getAuthUser()
 
@@ -195,18 +220,29 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ message: 'A valid productId is required.' }, { status: 400 })
   }
 
-  if (!body.quantity || body.quantity < 1) {
+  const quantity = normalizeQuantity(body.quantity, 0)
+
+  if (quantity < 1) {
     return NextResponse.json({ message: 'Quantity must be at least 1.' }, { status: 400 })
   }
 
   try {
-    if (!body.productId || !mongoose.Types.ObjectId.isValid(body.productId)) {
-      return NextResponse.json({ message: 'A valid productId is required.' }, { status: 400 })
+    if (!mongoose.Types.ObjectId.isValid(body.productId)) {
+      throw new Error(FALLBACK_PRODUCT_LOOKUP)
     }
 
     await dbConnect()
 
     const cart = await Cart.findOne({ userId: authUser.userId })
+    const product = await Product.findById(body.productId)
+
+    if (!product) {
+      return NextResponse.json({ message: 'Product not found.' }, { status: 404 })
+    }
+
+    if (quantity > product.stock) {
+      return NextResponse.json({ message: 'Not enough stock is available for this item.' }, { status: 400 })
+    }
 
     if (!cart) {
       return NextResponse.json({ message: 'Cart not found.' }, { status: 404 })
@@ -218,18 +254,27 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ message: 'Cart item not found.' }, { status: 404 })
     }
 
-    item.quantity = body.quantity
+    item.quantity = quantity
     await cart.save()
 
     return NextResponse.json({ message: 'Cart quantity updated.' }, { status: 200 })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown cart update error'
 
-    if (!isConnectionError(message)) {
+    if (message !== FALLBACK_PRODUCT_LOOKUP && !isConnectionError(message)) {
       return NextResponse.json({ message: 'Failed to update cart quantity.', error: message }, { status: 500 })
     }
 
     const cart = await getLocalCart(authUser.userId)
+    const product = await findLocalProductById(body.productId)
+
+    if (!product) {
+      return NextResponse.json({ message: 'Product not found.' }, { status: 404 })
+    }
+
+    if (quantity > product.stock) {
+      return NextResponse.json({ message: 'Not enough stock is available for this item.' }, { status: 400 })
+    }
 
     if (!cart) {
       return NextResponse.json({ message: 'Cart not found.' }, { status: 404 })
@@ -241,7 +286,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ message: 'Cart item not found.' }, { status: 404 })
     }
 
-    item.quantity = body.quantity
+    item.quantity = quantity
     cart.updatedAt = new Date().toISOString()
     await saveLocalCart(cart)
 
@@ -263,8 +308,8 @@ export async function DELETE(request: NextRequest) {
   }
 
   try {
-    if (!productId || !mongoose.Types.ObjectId.isValid(productId)) {
-      return NextResponse.json({ message: 'A valid productId is required.' }, { status: 400 })
+    if (!mongoose.Types.ObjectId.isValid(productId)) {
+      throw new Error(FALLBACK_PRODUCT_LOOKUP)
     }
 
     await dbConnect()
@@ -282,7 +327,7 @@ export async function DELETE(request: NextRequest) {
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown cart delete error'
 
-    if (!isConnectionError(message)) {
+    if (message !== FALLBACK_PRODUCT_LOOKUP && !isConnectionError(message)) {
       return NextResponse.json({ message: 'Failed to remove cart item.', error: message }, { status: 500 })
     }
 

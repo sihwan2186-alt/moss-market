@@ -4,6 +4,8 @@ import dbConnect from '@/db/dbConnect'
 import Product from '@/db/models/product'
 import { findLocalProductById } from '@/lib/dev-store'
 
+const FALLBACK_PRODUCT_LOOKUP = 'FALLBACK_PRODUCT_LOOKUP'
+
 function isConnectionError(message: string) {
   return (
     message.includes('querySrv') ||
@@ -18,7 +20,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 
   try {
     if (!mongoose.Types.ObjectId.isValid(id)) {
-      return NextResponse.json({ message: 'A valid product id is required.' }, { status: 400 })
+      throw new Error(FALLBACK_PRODUCT_LOOKUP)
     }
 
     await dbConnect()
@@ -32,7 +34,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown product detail error'
 
-    if (!isConnectionError(message)) {
+    if (message !== FALLBACK_PRODUCT_LOOKUP && !isConnectionError(message)) {
       return NextResponse.json({ message: 'Failed to load product.', error: message }, { status: 500 })
     }
 

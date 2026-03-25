@@ -2,7 +2,14 @@ import mongoose from 'mongoose'
 import { NextRequest, NextResponse } from 'next/server'
 import dbConnect from '@/db/dbConnect'
 import Product from '@/db/models/product'
-import { deleteLocalProduct, updateLocalProduct } from '@/lib/dev-store'
+import RestockSubscription from '@/db/models/restock-subscription'
+import {
+  deleteLocalProduct,
+  findLocalProductById,
+  markLocalRestockSubscriptionsNotified,
+  updateLocalProduct,
+} from '@/lib/dev-store'
+import { getAuthUser } from '@/lib/session'
 
 type ProductBody = {
   name?: string
@@ -14,6 +21,18 @@ type ProductBody = {
   featured?: boolean
 }
 
+type NormalizedProductInput = {
+  name: string
+  description: string
+  price: number
+  images: string[]
+  stock: number
+  category: string
+  featured: boolean
+}
+
+const FALLBACK_PRODUCT_LOOKUP = 'FALLBACK_PRODUCT_LOOKUP'
+
 function isConnectionError(message: string) {
   return (
     message.includes('querySrv') ||
@@ -23,71 +42,165 @@ function isConnectionError(message: string) {
   )
 }
 
+function normalizeProductBody(body: ProductBody): { data?: NormalizedProductInput; message?: string } {
+  const name = body.name?.trim() ?? ''
+  const description = body.description?.trim() ?? ''
+  const price = Number(body.price)
+  const stock = Number(body.stock ?? 0)
+  const images = Array.isArray(body.images)
+    ? body.images.map((image) => image.trim()).filter((image) => image.length > 0)
+    : []
+  const category = body.category?.trim() || 'General'
+
+  if (!name || !description || !Number.isFinite(price)) {
+    return {
+      message: 'Name, description, and numeric price are required.',
+    }
+  }
+
+  if (price < 0) {
+    return {
+      message: 'Price must be 0 or higher.',
+    }
+  }
+
+  if (!Number.isFinite(stock) || stock < 0) {
+    return {
+      message: 'Stock must be 0 or higher.',
+    }
+  }
+
+  return {
+    data: {
+      name,
+      description,
+      price,
+      images,
+      stock,
+      category,
+      featured: Boolean(body.featured),
+    },
+  }
+}
+
+async function notifyRestockSubscribers(productId: string) {
+  const subscriptions = await RestockSubscription.find({ productId, status: 'pending' }).select({ email: 1 }).lean()
+
+  if (subscriptions.length === 0) {
+    return []
+  }
+
+  await RestockSubscription.updateMany(
+    { productId, status: 'pending' },
+    { $set: { status: 'notified', notifiedAt: new Date() } }
+  )
+
+  return subscriptions.map((subscription) => subscription.email)
+}
+
+async function requireAdmin() {
+  const authUser = await getAuthUser()
+
+  if (!authUser) {
+    return NextResponse.json({ message: 'Please log in first.' }, { status: 401 })
+  }
+
+  if (authUser.role !== 'admin') {
+    return NextResponse.json({ message: 'Admin access is required.' }, { status: 403 })
+  }
+
+  return null
+}
+
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const authError = await requireAdmin()
+
+  if (authError) {
+    return authError
+  }
+
   const { id } = await params
   const body = (await request.json()) as ProductBody
+  const normalized = normalizeProductBody(body)
 
-  if (!body.name || !body.description || typeof body.price !== 'number') {
-    return NextResponse.json({ message: 'Name, description, and numeric price are required.' }, { status: 400 })
+  if (!normalized.data) {
+    return NextResponse.json({ message: normalized.message }, { status: 400 })
   }
 
   try {
     if (!mongoose.Types.ObjectId.isValid(id)) {
-      return NextResponse.json({ message: 'A valid product id is required.' }, { status: 400 })
+      throw new Error(FALLBACK_PRODUCT_LOOKUP)
     }
 
     await dbConnect()
+    const existingProduct = await Product.findById(id)
 
-    const product = await Product.findByIdAndUpdate(
-      id,
-      {
-        name: body.name,
-        description: body.description,
-        price: body.price,
-        images: body.images ?? [],
-        stock: body.stock ?? 0,
-        category: body.category ?? 'General',
-        featured: body.featured ?? false,
-      },
-      { new: true }
-    )
-
-    if (!product) {
+    if (!existingProduct) {
       return NextResponse.json({ message: 'Product not found.' }, { status: 404 })
     }
 
-    return NextResponse.json({ message: 'Product updated.', product }, { status: 200 })
+    const previousStock = existingProduct.stock
+    existingProduct.set(normalized.data)
+    await existingProduct.save()
+
+    const restockNotifications =
+      previousStock <= 0 && normalized.data.stock > 0 ? await notifyRestockSubscribers(id) : []
+
+    return NextResponse.json(
+      {
+        message: 'Product updated.',
+        product: existingProduct,
+        restockNotifications,
+      },
+      { status: 200 }
+    )
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown update error'
 
-    if (!isConnectionError(message)) {
+    if (message !== FALLBACK_PRODUCT_LOOKUP && !isConnectionError(message)) {
       return NextResponse.json({ message: 'Failed to update product.', error: message }, { status: 500 })
     }
 
-    const product = await updateLocalProduct(id, {
-      name: body.name,
-      description: body.description,
-      price: body.price,
-      images: body.images ?? [],
-      stock: body.stock ?? 0,
-      category: body.category ?? 'General',
-      featured: body.featured ?? false,
-    })
+    const existingProduct = await findLocalProductById(id)
+
+    if (!existingProduct) {
+      return NextResponse.json({ message: 'Product not found.' }, { status: 404 })
+    }
+
+    const previousStock = existingProduct.stock
+    const product = await updateLocalProduct(id, normalized.data)
 
     if (!product) {
       return NextResponse.json({ message: 'Product not found.' }, { status: 404 })
     }
 
-    return NextResponse.json({ message: 'Product updated.', product, mode: 'local-fallback' }, { status: 200 })
+    const restockNotifications =
+      previousStock <= 0 && normalized.data.stock > 0 ? await markLocalRestockSubscriptionsNotified(id) : []
+
+    return NextResponse.json(
+      {
+        message: 'Product updated.',
+        product,
+        mode: 'local-fallback',
+        restockNotifications,
+      },
+      { status: 200 }
+    )
   }
 }
 
 export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const authError = await requireAdmin()
+
+  if (authError) {
+    return authError
+  }
+
   const { id } = await params
 
   try {
     if (!mongoose.Types.ObjectId.isValid(id)) {
-      return NextResponse.json({ message: 'A valid product id is required.' }, { status: 400 })
+      throw new Error(FALLBACK_PRODUCT_LOOKUP)
     }
 
     await dbConnect()
@@ -102,7 +215,7 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown delete error'
 
-    if (!isConnectionError(message)) {
+    if (message !== FALLBACK_PRODUCT_LOOKUP && !isConnectionError(message)) {
       return NextResponse.json({ message: 'Failed to delete product.', error: message }, { status: 500 })
     }
 

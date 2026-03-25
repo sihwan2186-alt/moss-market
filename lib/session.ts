@@ -5,6 +5,7 @@ export type AuthPayload = {
   userId: string
   email: string
   role: string
+  name: string
 }
 
 export async function getAuthUser(): Promise<AuthPayload | null> {
@@ -18,5 +19,6 @@ export async function getAuthUser(): Promise<AuthPayload | null> {
     userId: session.user.id,
     email: session.user.email,
     role: session.user.role ?? 'customer',
+    name: session.user.name ?? '',
   }
 }
