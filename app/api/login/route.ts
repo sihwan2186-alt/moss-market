@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import dbConnect from '@/db/dbConnect'
 import User from '@/db/models/user'
+import {
+  ensureConfiguredAdminUserInDatabase,
+  ensureConfiguredAdminUserInLocalStore,
+  isConfiguredAdminEmail,
+} from '@/lib/admin-account'
 import { signAuthToken, verifyPassword } from '@/lib/auth'
 import { findLocalUserByEmail } from '@/lib/dev-user-store'
 import { getErrorMessage, logServerError } from '@/lib/server-error'
@@ -8,6 +13,7 @@ import { getErrorMessage, logServerError } from '@/lib/server-error'
 type LoginBody = {
   email?: string
   password?: string
+  loginMode?: 'customer' | 'admin'
 }
 
 function isConnectionError(message: string) {
@@ -23,6 +29,7 @@ export async function POST(request: NextRequest) {
   const body = (await request.json()) as LoginBody
   const email = body.email?.trim().toLowerCase()
   const password = body.password?.trim()
+  const loginMode = body.loginMode === 'admin' ? 'admin' : 'customer'
 
   if (!email || !password) {
     return NextResponse.json({ message: 'Email and password are required.' }, { status: 400 })
@@ -31,9 +38,17 @@ export async function POST(request: NextRequest) {
   try {
     await dbConnect()
 
+    if (loginMode === 'admin' && isConfiguredAdminEmail(email)) {
+      await ensureConfiguredAdminUserInDatabase()
+    }
+
     const user = await User.findOne({ email })
 
     if (!user || !verifyPassword(password, user.passwordHash)) {
+      return NextResponse.json({ message: 'The email or password is incorrect.' }, { status: 401 })
+    }
+
+    if (loginMode === 'admin' && user.role !== 'admin') {
       return NextResponse.json({ message: 'The email or password is incorrect.' }, { status: 401 })
     }
 
@@ -71,9 +86,17 @@ export async function POST(request: NextRequest) {
     const message = getErrorMessage(error)
 
     if (isConnectionError(message)) {
+      if (loginMode === 'admin' && isConfiguredAdminEmail(email)) {
+        await ensureConfiguredAdminUserInLocalStore()
+      }
+
       const user = await findLocalUserByEmail(email)
 
       if (!user || !verifyPassword(password, user.passwordHash)) {
+        return NextResponse.json({ message: 'The email or password is incorrect.' }, { status: 401 })
+      }
+
+      if (loginMode === 'admin' && user.role !== 'admin') {
         return NextResponse.json({ message: 'The email or password is incorrect.' }, { status: 401 })
       }
 

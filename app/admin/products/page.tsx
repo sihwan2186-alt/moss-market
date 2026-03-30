@@ -286,9 +286,9 @@ export default function AdminProductsPage() {
         ) : !user ? (
           <div className="rounded-[28px] border border-[#d6c5ae] bg-[#fff5e7] p-6 text-[#6d5641] shadow-[0_18px_60px_rgba(17,24,39,0.08)]">
             {t.adminProducts.needsLogin}
-            <a href="/auth?type=login" className="ml-2 font-semibold underline underline-offset-4">
-              {t.header.login}
-            </a>
+            <Link href="/auth?type=admin-login" className="ml-2 font-semibold underline underline-offset-4">
+              {t.header.adminLogin}
+            </Link>
           </div>
         ) : !isAdmin ? (
           <div className="rounded-[28px] border border-[#e1c9c9] bg-[#fff1f1] p-6 text-[#7a3d3d] shadow-[0_18px_60px_rgba(17,24,39,0.08)]">

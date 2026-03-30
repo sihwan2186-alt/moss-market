@@ -236,8 +236,8 @@ export default function AdminOrdersPage() {
         ) : !user ? (
           <div className="rounded-[28px] border border-[#d6c5ae] bg-[#fff5e7] p-6 text-[#6d5641] shadow-[0_18px_60px_rgba(17,24,39,0.08)]">
             {t.adminOrders.needsLogin}
-            <Link href="/auth?type=login" className="ml-2 font-semibold underline underline-offset-4">
-              {t.header.login}
+            <Link href="/auth?type=admin-login" className="ml-2 font-semibold underline underline-offset-4">
+              {t.header.adminLogin}
             </Link>
           </div>
         ) : !isAdmin ? (

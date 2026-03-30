@@ -15,6 +15,7 @@ function AuthContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const type = searchParams.get('type')
+  const isAdminLogin = type === 'admin-login'
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -31,21 +32,22 @@ function AuthContent() {
       const result = await signIn('credentials', {
         email,
         password,
+        loginMode: isAdminLogin ? 'admin' : 'customer',
         redirect: false,
       })
 
       if (!result?.ok) {
         setIsError(true)
-        setMessage(t.auth.loginFailed)
+        setMessage(isAdminLogin ? t.auth.adminLoginFailed : t.auth.loginFailed)
         return
       }
 
-      setMessage(t.auth.loginSuccess)
+      setMessage(isAdminLogin ? t.auth.adminLoginSuccess : t.auth.loginSuccess)
       setEmail('')
       setPassword('')
 
       window.setTimeout(() => {
-        router.push('/')
+        router.push(isAdminLogin ? '/admin/products' : '/')
         router.refresh()
       }, 400)
     } catch {
@@ -71,19 +73,39 @@ function AuthContent() {
 
   return (
     <AuthShell
-      title={t.auth.loginTitle}
-      subtitle={t.auth.loginSubtitle}
+      title={isAdminLogin ? t.auth.adminLoginTitle : t.auth.loginTitle}
+      subtitle={isAdminLogin ? t.auth.adminLoginSubtitle : t.auth.loginSubtitle}
       footer={
         <>
           <Link href="/auth?type=forgetpass" className="font-semibold text-[#1d3124] underline underline-offset-4">
             {t.auth.forgotPassword}
           </Link>
-          <p className="mt-3">
-            {t.auth.needAccount}{' '}
-            <Link href="/auth?type=sign-up" className="font-semibold text-[#1d3124] underline underline-offset-4">
-              {t.auth.signUp}
-            </Link>
-          </p>
+          {isAdminLogin ? (
+            <p className="mt-3">
+              {t.auth.needCustomerAccess}{' '}
+              <Link href="/auth?type=login" className="font-semibold text-[#1d3124] underline underline-offset-4">
+                {t.auth.customerLogin}
+              </Link>
+            </p>
+          ) : (
+            <>
+              <p className="mt-3">
+                {t.auth.needAccount}{' '}
+                <Link href="/auth?type=sign-up" className="font-semibold text-[#1d3124] underline underline-offset-4">
+                  {t.auth.signUp}
+                </Link>
+              </p>
+              <p className="mt-3">
+                {t.auth.needAdminAccess}{' '}
+                <Link
+                  href="/auth?type=admin-login"
+                  className="font-semibold text-[#1d3124] underline underline-offset-4"
+                >
+                  {t.header.adminLogin}
+                </Link>
+              </p>
+            </>
+          )}
         </>
       }
     >
