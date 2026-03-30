@@ -10,6 +10,7 @@ import {
   getLocalProducts,
   saveLocalCart,
 } from '@/lib/dev-store'
+import { getErrorMessage, logServerError } from '@/lib/server-error'
 import { getAuthUser } from '@/lib/session'
 
 type AddToCartBody = {
@@ -82,10 +83,11 @@ export async function GET() {
 
     return NextResponse.json({ items, totalPrice }, { status: 200 })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown cart error'
+    const message = getErrorMessage(error)
 
     if (!isConnectionError(message)) {
-      return NextResponse.json({ message: 'Failed to load cart.', error: message }, { status: 500 })
+      logServerError('cart:get', error)
+      return NextResponse.json({ message: 'Failed to load cart.' }, { status: 500 })
     }
 
     const cart = await getLocalCart(authUser.userId)
@@ -166,10 +168,11 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ message: 'Product added to cart.', cartId: cart._id.toString() }, { status: 200 })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown add to cart error'
+    const message = getErrorMessage(error)
 
     if (message !== FALLBACK_PRODUCT_LOOKUP && !isConnectionError(message)) {
-      return NextResponse.json({ message: 'Failed to update cart.', error: message }, { status: 500 })
+      logServerError('cart:add', error)
+      return NextResponse.json({ message: 'Failed to update cart.' }, { status: 500 })
     }
 
     const product = await findLocalProductById(body.productId)
@@ -259,10 +262,11 @@ export async function PATCH(request: NextRequest) {
 
     return NextResponse.json({ message: 'Cart quantity updated.' }, { status: 200 })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown cart update error'
+    const message = getErrorMessage(error)
 
     if (message !== FALLBACK_PRODUCT_LOOKUP && !isConnectionError(message)) {
-      return NextResponse.json({ message: 'Failed to update cart quantity.', error: message }, { status: 500 })
+      logServerError('cart:updateQuantity', error)
+      return NextResponse.json({ message: 'Failed to update cart quantity.' }, { status: 500 })
     }
 
     const cart = await getLocalCart(authUser.userId)
@@ -325,10 +329,11 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ message: 'Item removed from cart.' }, { status: 200 })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown cart delete error'
+    const message = getErrorMessage(error)
 
     if (message !== FALLBACK_PRODUCT_LOOKUP && !isConnectionError(message)) {
-      return NextResponse.json({ message: 'Failed to remove cart item.', error: message }, { status: 500 })
+      logServerError('cart:deleteItem', error)
+      return NextResponse.json({ message: 'Failed to remove cart item.' }, { status: 500 })
     }
 
     const cart = await getLocalCart(authUser.userId)

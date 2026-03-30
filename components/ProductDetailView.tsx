@@ -22,14 +22,13 @@ type ProductDetail = {
 type ProductDetailViewProps = {
   product: ProductDetail | null
   source: 'database' | 'fallback'
-  error?: string
 }
 
 function getStockLabel(stock: number, locale: Locale, availableLabel: string) {
   return locale === 'ko' ? `${stock}${availableLabel}` : `${stock} ${availableLabel}`
 }
 
-export default function ProductDetailView({ product, source, error }: ProductDetailViewProps) {
+export default function ProductDetailView({ product, source }: ProductDetailViewProps) {
   const { locale, messages: t } = useLanguage()
   const [selectedImage, setSelectedImage] = useState('')
   const initialImage = product?.images[0] ?? ''
@@ -70,7 +69,6 @@ export default function ProductDetailView({ product, source, error }: ProductDet
         {source === 'fallback' && (
           <div className="mt-6 rounded-[24px] border border-[#d9c9b0] bg-[#fff6e9] p-4 text-sm text-[#6c5840]">
             {t.productDetail.fallback}
-            {error ? ` Error: ${error}` : ''}
           </div>
         )}
 

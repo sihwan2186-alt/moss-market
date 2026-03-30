@@ -12,6 +12,7 @@ import {
   updateLocalProductStock,
 } from '@/lib/dev-store'
 import { parseOptionalJsonBody } from '@/lib/json-body'
+import { getErrorMessage, logServerError } from '@/lib/server-error'
 import { getAuthUser } from '@/lib/session'
 import { NextRequest, NextResponse } from 'next/server'
 
@@ -136,10 +137,11 @@ export async function GET() {
 
     return NextResponse.json({ orders }, { status: 200 })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown orders error'
+    const message = getErrorMessage(error)
 
     if (!isConnectionError(message)) {
-      return NextResponse.json({ message: 'Failed to load orders.', error: message }, { status: 500 })
+      logServerError('orders:get', error)
+      return NextResponse.json({ message: 'Failed to load orders.' }, { status: 500 })
     }
 
     const orders = await getLocalOrders(authUser.userId)
@@ -225,14 +227,15 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ message: 'Order created successfully.', orderId: order._id.toString() }, { status: 201 })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown checkout error'
+    const message = getErrorMessage(error)
 
     if (isKnownCheckoutError(message)) {
       return NextResponse.json({ message }, { status: 400 })
     }
 
     if (!isConnectionError(message)) {
-      return NextResponse.json({ message: 'Failed to create order.', error: message }, { status: 500 })
+      logServerError('orders:create', error)
+      return NextResponse.json({ message: 'Failed to create order.' }, { status: 500 })
     }
 
     let cart = await getLocalCart(authUser.userId)

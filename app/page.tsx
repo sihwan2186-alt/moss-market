@@ -4,7 +4,7 @@ import { getProductsWithFallback } from '@/lib/store'
 
 export default async function Home() {
   const authUser = await getAuthUser()
-  const { products, source, error } = await getProductsWithFallback()
+  const { products, source } = await getProductsWithFallback()
   const catalogProducts = products.map((product) => ({
     id: product._id.toString(),
     name: product.name,
@@ -15,5 +15,5 @@ export default async function Home() {
     stock: product.stock,
   }))
 
-  return <HomePageContent products={catalogProducts} source={source} error={error} isLoggedIn={Boolean(authUser)} />
+  return <HomePageContent products={catalogProducts} source={source} isLoggedIn={Boolean(authUser)} />
 }

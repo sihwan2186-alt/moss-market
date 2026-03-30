@@ -4,6 +4,7 @@ import PasswordResetToken from '@/db/models/password-reset-token'
 import User from '@/db/models/user'
 import { createSecureToken, hashToken } from '@/lib/auth'
 import { createLocalPasswordResetToken, findLocalUserByEmail } from '@/lib/dev-user-store'
+import { getErrorMessage, logServerError } from '@/lib/server-error'
 
 type PasswordResetRequestBody = {
   email?: string
@@ -69,10 +70,11 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ message: GENERIC_RESET_MESSAGE }, { status: 200 })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown password reset request error'
+    const message = getErrorMessage(error)
 
     if (!isConnectionError(message)) {
-      return NextResponse.json({ message: 'Could not create a password reset link.', error: message }, { status: 500 })
+      logServerError('password-reset:request', error)
+      return NextResponse.json({ message: 'Could not create a password reset link.' }, { status: 500 })
     }
 
     const user = await findLocalUserByEmail(email)

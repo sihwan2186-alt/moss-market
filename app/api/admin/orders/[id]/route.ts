@@ -4,6 +4,7 @@ import dbConnect from '@/db/dbConnect'
 import Order from '@/db/models/order'
 import Product from '@/db/models/product'
 import { findLocalOrderById, updateLocalOrderStatus, updateLocalProductStock } from '@/lib/dev-store'
+import { getErrorMessage, logServerError } from '@/lib/server-error'
 import { getAuthUser } from '@/lib/session'
 
 type UpdateOrderBody = {
@@ -101,10 +102,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     return NextResponse.json({ message: 'Order status updated.', order }, { status: 200 })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown admin order update error'
+    const message = getErrorMessage(error)
 
     if (message !== FALLBACK_ORDER_LOOKUP && !isConnectionError(message)) {
-      return NextResponse.json({ message: 'Failed to update order.', error: message }, { status: 500 })
+      logServerError('admin-orders:updateStatus', error)
+      return NextResponse.json({ message: 'Failed to update order.' }, { status: 500 })
     }
 
     const order = await findLocalOrderById(id)

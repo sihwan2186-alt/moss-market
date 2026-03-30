@@ -3,6 +3,7 @@ import dbConnect from '@/db/dbConnect'
 import User from '@/db/models/user'
 import { signAuthToken, verifyPassword } from '@/lib/auth'
 import { findLocalUserByEmail } from '@/lib/dev-user-store'
+import { getErrorMessage, logServerError } from '@/lib/server-error'
 
 type LoginBody = {
   email?: string
@@ -67,7 +68,7 @@ export async function POST(request: NextRequest) {
 
     return response
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown login error'
+    const message = getErrorMessage(error)
 
     if (isConnectionError(message)) {
       const user = await findLocalUserByEmail(email)
@@ -109,6 +110,8 @@ export async function POST(request: NextRequest) {
       return response
     }
 
-    return NextResponse.json({ message: 'Login failed.', error: message }, { status: 500 })
+    logServerError('login', error)
+
+    return NextResponse.json({ message: 'Login failed.' }, { status: 500 })
   }
 }

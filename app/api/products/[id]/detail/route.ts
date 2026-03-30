@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import dbConnect from '@/db/dbConnect'
 import Product from '@/db/models/product'
 import { findLocalProductById } from '@/lib/dev-store'
+import { getErrorMessage, logServerError } from '@/lib/server-error'
 
 const FALLBACK_PRODUCT_LOOKUP = 'FALLBACK_PRODUCT_LOOKUP'
 
@@ -32,10 +33,11 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 
     return NextResponse.json({ product }, { status: 200 })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown product detail error'
+    const message = getErrorMessage(error)
 
     if (message !== FALLBACK_PRODUCT_LOOKUP && !isConnectionError(message)) {
-      return NextResponse.json({ message: 'Failed to load product.', error: message }, { status: 500 })
+      logServerError('products:getDetail', error)
+      return NextResponse.json({ message: 'Failed to load product.' }, { status: 500 })
     }
 
     const product = await findLocalProductById(id)
