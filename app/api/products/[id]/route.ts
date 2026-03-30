@@ -9,6 +9,7 @@ import {
   markLocalRestockSubscriptionsNotified,
   updateLocalProduct,
 } from '@/lib/dev-store'
+import { getErrorMessage, logServerError } from '@/lib/server-error'
 import { getAuthUser } from '@/lib/session'
 
 type ProductBody = {
@@ -161,10 +162,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       { status: 200 }
     )
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown update error'
+    const message = getErrorMessage(error)
 
     if (message !== FALLBACK_PRODUCT_LOOKUP && !isConnectionError(message)) {
-      return NextResponse.json({ message: 'Failed to update product.', error: message }, { status: 500 })
+      logServerError('products:update', error)
+      return NextResponse.json({ message: 'Failed to update product.' }, { status: 500 })
     }
 
     const existingProduct = await findLocalProductById(id)
@@ -219,10 +221,11 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
 
     return NextResponse.json({ message: 'Product deleted.' }, { status: 200 })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown delete error'
+    const message = getErrorMessage(error)
 
     if (message !== FALLBACK_PRODUCT_LOOKUP && !isConnectionError(message)) {
-      return NextResponse.json({ message: 'Failed to delete product.', error: message }, { status: 500 })
+      logServerError('products:delete', error)
+      return NextResponse.json({ message: 'Failed to delete product.' }, { status: 500 })
     }
 
     const deleted = await deleteLocalProduct(id)

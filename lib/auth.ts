@@ -18,8 +18,8 @@ export function verifyPassword(password: string, storedHash: string) {
   }
 
   const derivedKey = crypto.scryptSync(password, salt, HASH_KEY_LENGTH).toString('hex')
-  const originalBuffer = Buffer.from(originalHash, 'hex')
-  const derivedBuffer = Buffer.from(derivedKey, 'hex')
+  const originalBuffer = Uint8Array.from(Buffer.from(originalHash, 'hex'))
+  const derivedBuffer = Uint8Array.from(Buffer.from(derivedKey, 'hex'))
 
   if (originalBuffer.length !== derivedBuffer.length) {
     return false

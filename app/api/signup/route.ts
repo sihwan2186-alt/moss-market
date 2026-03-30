@@ -3,6 +3,7 @@ import dbConnect from '@/db/dbConnect'
 import User from '@/db/models/user'
 import { hashPassword } from '@/lib/auth'
 import { createLocalUser, findLocalUserByEmail } from '@/lib/dev-user-store'
+import { getErrorMessage, logServerError } from '@/lib/server-error'
 
 type SignUpBody = {
   name?: string
@@ -62,7 +63,7 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     )
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown sign up error'
+    const message = getErrorMessage(error)
 
     if (isConnectionError(message)) {
       const existingLocalUser = await findLocalUserByEmail(email)
@@ -99,12 +100,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    return NextResponse.json(
-      {
-        message: 'Sign up failed.',
-        error: message,
-      },
-      { status: 500 }
-    )
+    logServerError('signup', error)
+
+    return NextResponse.json({ message: 'Sign up failed.' }, { status: 500 })
   }
 }

@@ -9,6 +9,7 @@ import {
   findPendingLocalRestockSubscription,
 } from '@/lib/dev-store'
 import { parseOptionalJsonBody } from '@/lib/json-body'
+import { getErrorMessage, logServerError } from '@/lib/server-error'
 import { getAuthUser } from '@/lib/session'
 
 type RestockBody = {
@@ -76,10 +77,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     return NextResponse.json({ message: 'Restock alert created.' }, { status: 201 })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown restock subscription error'
+    const message = getErrorMessage(error)
 
     if (message !== FALLBACK_PRODUCT_LOOKUP && !isConnectionError(message)) {
-      return NextResponse.json({ message: 'Could not create a restock alert.', error: message }, { status: 500 })
+      logServerError('products:createRestockAlert', error)
+      return NextResponse.json({ message: 'Could not create a restock alert.' }, { status: 500 })
     }
 
     const product = await findLocalProductById(id)
