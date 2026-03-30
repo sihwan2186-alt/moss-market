@@ -8,7 +8,7 @@ type ProductDetailPageProps = {
 }
 
 export default async function ProductDetailPage({ params }: ProductDetailPageProps) {
-  const { product, source, error } = await getProductByIdWithFallback(params.id)
+  const { product, source } = await getProductByIdWithFallback(params.id)
 
   return (
     <ProductDetailView
@@ -26,7 +26,6 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
           : null
       }
       source={source}
-      error={error}
     />
   )
 }
