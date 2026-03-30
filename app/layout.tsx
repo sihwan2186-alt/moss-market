@@ -28,12 +28,14 @@ export const metadata: Metadata = {
   },
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
-  const locale = detectLocale(cookies().get('locale')?.value, headers().get('accept-language'))
+  const cookieStore = await cookies()
+  const headerStore = await headers()
+  const locale = detectLocale(cookieStore.get('locale')?.value, headerStore.get('accept-language'))
 
   return (
     <html lang={locale} translate="no">
