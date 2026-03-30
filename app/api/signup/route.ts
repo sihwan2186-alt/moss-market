@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { isConfiguredAdminEmail } from '@/lib/admin-account'
 import dbConnect from '@/db/dbConnect'
 import User from '@/db/models/user'
 import { hashPassword } from '@/lib/auth'
@@ -28,6 +29,10 @@ export async function POST(request: NextRequest) {
 
   if (!name || !email || !password) {
     return NextResponse.json({ message: 'Name, email, and password are required.' }, { status: 400 })
+  }
+
+  if (isConfiguredAdminEmail(email)) {
+    return NextResponse.json({ message: 'This email is reserved for the administrator account.' }, { status: 403 })
   }
 
   if (password.length < 8) {

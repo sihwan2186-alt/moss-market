@@ -81,6 +81,35 @@ export async function createLocalUser(input: Omit<LocalUser, 'id' | 'createdAt' 
   return user
 }
 
+export async function upsertLocalUser(input: Omit<LocalUser, 'id' | 'createdAt' | 'updatedAt'>) {
+  const users = await readLocalUsers()
+  const now = new Date().toISOString()
+  const existingUser = users.find((user) => user.email === input.email)
+
+  if (existingUser) {
+    existingUser.name = input.name
+    existingUser.passwordHash = input.passwordHash
+    existingUser.role = input.role
+    existingUser.updatedAt = now
+
+    await fs.writeFile(usersFile, JSON.stringify(users, null, 2), 'utf8')
+
+    return existingUser
+  }
+
+  const user: LocalUser = {
+    id: crypto.randomUUID(),
+    createdAt: now,
+    updatedAt: now,
+    ...input,
+  }
+
+  users.push(user)
+  await fs.writeFile(usersFile, JSON.stringify(users, null, 2), 'utf8')
+
+  return user
+}
+
 export async function updateLocalUserPassword(userId: string, passwordHash: string) {
   const users = await readLocalUsers()
   const user = users.find((entry) => entry.id === userId)

@@ -2,6 +2,11 @@ import type { NextAuthOptions } from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import dbConnect from '@/db/dbConnect'
 import User from '@/db/models/user'
+import {
+  ensureConfiguredAdminUserInDatabase,
+  ensureConfiguredAdminUserInLocalStore,
+  isConfiguredAdminEmail,
+} from '@/lib/admin-account'
 import { verifyPassword } from '@/lib/auth'
 import { findLocalUserByEmail } from '@/lib/dev-user-store'
 
@@ -28,6 +33,7 @@ export const authOptions: NextAuthOptions = {
       credentials: {
         email: { label: 'Email', type: 'email' },
         password: { label: 'Password', type: 'password' },
+        loginMode: { label: 'Login Mode', type: 'text' },
       },
       async authorize(credentials) {
         if (!credentials) {
@@ -38,6 +44,7 @@ export const authOptions: NextAuthOptions = {
           .trim()
           .toLowerCase()
         const password = String(credentials.password ?? '').trim()
+        const loginMode = String(credentials.loginMode ?? 'customer') === 'admin' ? 'admin' : 'customer'
 
         if (!email || !password) {
           return null
@@ -45,9 +52,18 @@ export const authOptions: NextAuthOptions = {
 
         try {
           await dbConnect()
+
+          if (loginMode === 'admin' && isConfiguredAdminEmail(email)) {
+            await ensureConfiguredAdminUserInDatabase()
+          }
+
           const user = await User.findOne({ email })
 
           if (!user || !verifyPassword(password, user.passwordHash)) {
+            return null
+          }
+
+          if (loginMode === 'admin' && user.role !== 'admin') {
             return null
           }
 
@@ -64,9 +80,17 @@ export const authOptions: NextAuthOptions = {
             return null
           }
 
+          if (loginMode === 'admin' && isConfiguredAdminEmail(email)) {
+            await ensureConfiguredAdminUserInLocalStore()
+          }
+
           const user = await findLocalUserByEmail(email)
 
           if (!user || !verifyPassword(password, user.passwordHash)) {
+            return null
+          }
+
+          if (loginMode === 'admin' && user.role !== 'admin') {
             return null
           }
 
