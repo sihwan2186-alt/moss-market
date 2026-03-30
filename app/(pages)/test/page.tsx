@@ -22,6 +22,9 @@ export default function DatabaseCheckPage() {
   const { messages: t } = useLanguage()
   const [result, setResult] = useState<HealthResponse | null>(null)
   const [loading, setLoading] = useState(false)
+  const hasDiagnosticDetails = Boolean(
+    result?.database || result?.host || result?.readyState !== undefined || result?.collections?.users !== undefined
+  )
 
   const checkDatabase = async () => {
     try {
@@ -105,7 +108,7 @@ export default function DatabaseCheckPage() {
               </span>
             </div>
 
-            {result.ok ? (
+            {result.ok && hasDiagnosticDetails ? (
               <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <div className="rounded-[20px] bg-[#faf7f1] p-4">
                   <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#68806f]">
@@ -130,7 +133,7 @@ export default function DatabaseCheckPage() {
                   <p className="mt-3 font-bold">{result.collections?.users ?? 0}</p>
                 </div>
               </div>
-            ) : (
+            ) : !result.ok && (result.error || result.hint) ? (
               <div className="mt-6 space-y-3 text-sm text-[#7a3d3d]">
                 <p>
                   {t.health.errorLabel}: {result.error ?? 'Unknown error'}
@@ -141,7 +144,7 @@ export default function DatabaseCheckPage() {
                   </p>
                 )}
               </div>
-            )}
+            ) : null}
           </section>
         )}
       </main>

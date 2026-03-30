@@ -8,6 +8,7 @@ import {
   markLocalPasswordResetTokenUsed,
   updateLocalUserPassword,
 } from '@/lib/dev-user-store'
+import { getErrorMessage, logServerError } from '@/lib/server-error'
 
 type PasswordResetConfirmBody = {
   token?: string
@@ -53,10 +54,11 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ valid: true }, { status: 200 })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown password reset validation error'
+    const message = getErrorMessage(error)
 
     if (!isConnectionError(message)) {
-      return NextResponse.json({ message: 'Could not validate the reset token.', error: message }, { status: 500 })
+      logServerError('password-reset:validate', error)
+      return NextResponse.json({ message: 'Could not validate the reset token.' }, { status: 500 })
     }
 
     const resetToken = await findLocalPasswordResetTokenByHash(tokenHash)
@@ -106,10 +108,11 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ message: 'Password reset complete. You can now log in.' }, { status: 200 })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown password reset confirm error'
+    const message = getErrorMessage(error)
 
     if (!isConnectionError(message)) {
-      return NextResponse.json({ message: 'Could not reset the password.', error: message }, { status: 500 })
+      logServerError('password-reset:confirm', error)
+      return NextResponse.json({ message: 'Could not reset the password.' }, { status: 500 })
     }
 
     const resetToken = await findLocalPasswordResetTokenByHash(tokenHash)

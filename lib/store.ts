@@ -1,6 +1,7 @@
 import dbConnect from '@/db/dbConnect'
 import Product from '@/db/models/product'
 import { deprecatedSampleProductNames, seedProducts } from '@/lib/sample-products'
+import { logServerError } from '@/lib/server-error'
 
 type ProductLike = {
   _id: { toString(): string } | string
@@ -99,7 +100,6 @@ export async function getProducts() {
 export async function getProductsWithFallback(): Promise<{
   products: ProductLike[]
   source: 'database' | 'fallback'
-  error?: string
 }> {
   try {
     const products = await getProducts()
@@ -109,7 +109,7 @@ export async function getProductsWithFallback(): Promise<{
       source: 'database',
     }
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown store error'
+    logServerError('store:getProductsWithFallback', error)
 
     return {
       products: seedProducts.map((product, index) => ({
@@ -117,7 +117,6 @@ export async function getProductsWithFallback(): Promise<{
         ...product,
       })),
       source: 'fallback',
-      error: message,
     }
   }
 }
@@ -125,7 +124,6 @@ export async function getProductsWithFallback(): Promise<{
 export async function getProductByIdWithFallback(productId: string): Promise<{
   product: ProductLike | null
   source: 'database' | 'fallback'
-  error?: string
 }> {
   try {
     await ensureProductsSeeded()
@@ -136,7 +134,7 @@ export async function getProductByIdWithFallback(productId: string): Promise<{
       source: 'database',
     }
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown store error'
+    logServerError('store:getProductByIdWithFallback', error)
     const fallbackProduct =
       seedProducts
         .map((product, index) => ({
@@ -148,7 +146,6 @@ export async function getProductByIdWithFallback(productId: string): Promise<{
     return {
       product: fallbackProduct,
       source: 'fallback',
-      error: message,
     }
   }
 }

@@ -2,6 +2,7 @@
 
 import Image from 'next/image'
 import Link from 'next/link'
+import { useParams } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import { useLanguage } from '@/components/LanguageProvider'
 import { formatDateTime } from '@/lib/i18n'
@@ -39,12 +40,6 @@ type Order = {
   items: OrderItem[]
 }
 
-type OrderDetailPageProps = {
-  params: {
-    id: string
-  }
-}
-
 function formatAddress(shippingAddress?: ShippingAddress) {
   if (!shippingAddress) {
     return ''
@@ -62,9 +57,10 @@ function formatAddress(shippingAddress?: ShippingAddress) {
     .join(', ')
 }
 
-export default function OrderDetailPage({ params }: OrderDetailPageProps) {
+export default function OrderDetailPage() {
+  const params = useParams<{ id: string }>()
   const { locale, messages: t } = useLanguage()
-  const orderId = params.id
+  const orderId = params?.id ?? ''
   const [order, setOrder] = useState<Order | null>(null)
   const [mode, setMode] = useState<'database' | 'local-fallback'>('database')
   const [message, setMessage] = useState('')

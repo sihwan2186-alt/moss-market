@@ -17,11 +17,10 @@ type CatalogProduct = {
 type HomePageContentProps = {
   products: CatalogProduct[]
   source: 'database' | 'fallback'
-  error?: string
   isLoggedIn: boolean
 }
 
-export default function HomePageContent({ products, source, error, isLoggedIn }: HomePageContentProps) {
+export default function HomePageContent({ products, source, isLoggedIn }: HomePageContentProps) {
   const { messages: t } = useLanguage()
 
   return (
@@ -63,7 +62,6 @@ export default function HomePageContent({ products, source, error, isLoggedIn }:
         {source === 'fallback' && (
           <div className="mt-12 rounded-[24px] border border-[#d9c9b0] bg-[#fff6e9] p-4 text-sm text-[#6c5840]">
             {t.home.fallback}
-            {error ? ` Error: ${error}` : ''}
           </div>
         )}
 

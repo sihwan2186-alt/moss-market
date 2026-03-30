@@ -3,6 +3,7 @@ import dbConnect from '@/db/dbConnect'
 import Order from '@/db/models/order'
 import { getAllLocalOrders } from '@/lib/dev-store'
 import { findLocalUserById } from '@/lib/dev-user-store'
+import { getErrorMessage, logServerError } from '@/lib/server-error'
 import { getAuthUser } from '@/lib/session'
 
 function isConnectionError(message: string) {
@@ -31,10 +32,11 @@ export async function GET() {
 
     return NextResponse.json({ orders }, { status: 200 })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown admin orders error'
+    const message = getErrorMessage(error)
 
     if (!isConnectionError(message)) {
-      return NextResponse.json({ message: 'Failed to load admin orders.', error: message }, { status: 500 })
+      logServerError('admin-orders:get', error)
+      return NextResponse.json({ message: 'Failed to load admin orders.' }, { status: 500 })
     }
 
     const orders = await getAllLocalOrders()
