@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useMemo, useState } from 'react'
 import { useLanguage } from '@/components/LanguageProvider'
 import ProductCard from '@/components/ProductCard'
@@ -75,9 +76,9 @@ export default function ProductCatalog({ products }: ProductCatalogProps) {
           <p className="text-sm font-semibold uppercase tracking-[0.3em] text-[#68806f]">{t.catalog.eyebrow}</p>
           <h2 className="mt-2 text-3xl font-black tracking-tight">{t.catalog.title}</h2>
         </div>
-        <a href="/orders" className="text-sm font-semibold text-[#1d3124] underline underline-offset-4">
+        <Link href="/orders" className="text-sm font-semibold text-[#1d3124] underline underline-offset-4">
           {t.catalog.viewOrderHistory}
-        </a>
+        </Link>
       </div>
 
       <div className="mb-8 grid gap-4 rounded-[28px] bg-white p-5 shadow-[0_18px_60px_rgba(17,24,39,0.08)] lg:grid-cols-[1.1fr_0.7fr_0.7fr_auto]">

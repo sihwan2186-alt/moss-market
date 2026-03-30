@@ -136,9 +136,9 @@ export default function CartPage() {
             <p className="text-sm font-semibold uppercase tracking-[0.3em] text-[#68806f]">{t.cart.eyebrow}</p>
             <h1 className="mt-2 text-4xl font-black tracking-tight">{t.cart.title}</h1>
           </div>
-          <a href="/" className="text-sm font-semibold text-[#1d3124] underline underline-offset-4">
+          <Link href="/" className="text-sm font-semibold text-[#1d3124] underline underline-offset-4">
             {t.cart.continueShopping}
-          </a>
+          </Link>
         </div>
 
         {mode === 'local-fallback' && !needsLogin && (
@@ -150,9 +150,9 @@ export default function CartPage() {
         {needsLogin && (
           <div className="mb-6 rounded-[24px] border border-[#d6c5ae] bg-[#fff5e7] p-5 text-sm text-[#6d5641]">
             {t.cart.needsLogin}
-            <a href="/auth?type=login" className="ml-2 font-semibold underline underline-offset-4">
+            <Link href="/auth?type=login" className="ml-2 font-semibold underline underline-offset-4">
               {t.header.login}
-            </a>
+            </Link>
           </div>
         )}
 
@@ -162,9 +162,9 @@ export default function CartPage() {
             <span className="ml-2 font-semibold">
               {t.cart.reference}: {lastOrderId}
             </span>
-            <a href="/orders" className="ml-3 font-semibold underline underline-offset-4">
+            <Link href="/orders" className="ml-3 font-semibold underline underline-offset-4">
               {t.cart.viewOrders}
-            </a>
+            </Link>
           </div>
         )}
 
