@@ -19,11 +19,11 @@ const geistMono = localFont({
 
 export const metadata: Metadata = {
   title: 'Moss Market',
-  description: 'MongoDB-powered storefront starter built with Next.js and TypeScript.',
+  description: 'MongoDB-powered storefront for curated goods built with Next.js and TypeScript.',
   keywords: ['Next.js', 'MongoDB', 'TypeScript', 'storefront', 'ecommerce', 'Vercel'],
   openGraph: {
     title: 'Moss Market',
-    description: 'MongoDB-powered storefront starter built with Next.js and TypeScript.',
+    description: 'MongoDB-powered storefront for curated goods built with Next.js and TypeScript.',
     type: 'website',
   },
 }

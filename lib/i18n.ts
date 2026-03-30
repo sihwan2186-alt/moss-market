@@ -43,7 +43,7 @@ export const messages = {
       eyebrow: 'Curated Everyday Goods',
       title: 'Build your shop faster with a real MongoDB-backed storefront.',
       description:
-        'This starter now includes customer signup, login, product listing, cart storage, checkout, and order history endpoints so you can keep building from a working base instead of a blank screen.',
+        'Customer signup, login, product discovery, cart storage, checkout, and order history are already connected so you can launch a smooth shopping flow right away.',
       createAccount: 'Create account',
       openCart: 'Open cart',
       healthCheck: 'Health check',
@@ -52,7 +52,7 @@ export const messages = {
         'MongoDB connection and seed products',
         'Signup, login, and logout API routes',
         'Cart and order creation endpoints',
-        'Starter shop, cart, and orders pages',
+        'Shop, cart, and order pages',
       ],
       nextBuildStep: 'Next build step',
       nextBuildDescription:
@@ -396,7 +396,7 @@ export const messages = {
       eyebrow: '일상에 어울리는 상품',
       title: 'MongoDB 기반 스토어를 더 빠르게 시작해보세요.',
       description:
-        '이 스타터에는 회원가입, 로그인, 상품 목록, 장바구니 저장, 체크아웃, 주문내역까지 포함되어 있어 처음부터 전부 만들지 않고 바로 확장할 수 있습니다.',
+        '회원가입, 로그인, 상품 목록, 장바구니, 체크아웃, 주문내역 흐름이 준비되어 있어 바로 판매 경험을 확장할 수 있습니다.',
       createAccount: '회원가입',
       openCart: '장바구니 열기',
       healthCheck: '연결 상태 확인',
