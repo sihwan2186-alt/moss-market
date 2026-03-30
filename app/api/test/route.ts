@@ -1,38 +1,48 @@
 import { NextResponse } from 'next/server'
 import dbConnect from '@/db/dbConnect'
 import User from '@/db/models/user'
+import { getAuthUser } from '@/lib/session'
 
 export async function GET() {
+  const authUser = await getAuthUser()
+  const includeDiagnostics = process.env.NODE_ENV !== 'production' || authUser?.role === 'admin'
+
   try {
     const connection = await dbConnect()
-    const userCount = await User.countDocuments()
+    const userCount = includeDiagnostics ? await User.countDocuments() : undefined
 
     return NextResponse.json(
-      {
-        ok: true,
-        message: 'MongoDB connection successful.',
-        database: connection.name,
-        host: connection.host,
-        readyState: connection.readyState,
-        collections: {
-          users: userCount,
-        },
-      },
+      includeDiagnostics
+        ? {
+            ok: true,
+            message: 'MongoDB connection successful.',
+            database: connection.name,
+            host: connection.host,
+            readyState: connection.readyState,
+            collections: {
+              users: userCount ?? 0,
+            },
+          }
+        : {
+            ok: true,
+            message: 'MongoDB connection successful.',
+          },
       { status: 200 }
     )
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown database error'
-    const hint = message.includes('querySrv')
-      ? 'Your network or DNS is blocking MongoDB SRV lookups. Try using the standard MongoDB connection string from Atlas instead of mongodb+srv.'
-      : undefined
+    console.error('[health-check]', error)
 
     return NextResponse.json(
-      {
-        ok: false,
-        message: 'MongoDB connection failed.',
-        error: message,
-        hint,
-      },
+      includeDiagnostics
+        ? {
+            ok: false,
+            message: 'MongoDB connection failed.',
+            hint: 'Detailed diagnostics are available in the server logs.',
+          }
+        : {
+            ok: false,
+            message: 'MongoDB connection failed.',
+          },
       { status: 500 }
     )
   }
