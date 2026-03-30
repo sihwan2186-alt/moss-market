@@ -93,7 +93,12 @@ export default function StoreHeader({ cartCount }: StoreHeaderProps) {
               </button>
             </>
           ) : (
-            <Link href="/auth?type=login">{t.header.login}</Link>
+            <>
+              <Link href="/auth?type=login">{t.header.login}</Link>
+              <Link href="/auth?type=admin-login" className="font-semibold text-[#1d3124]">
+                {t.header.adminLogin}
+              </Link>
+            </>
           )}
         </nav>
       </div>
