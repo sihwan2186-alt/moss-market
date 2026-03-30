@@ -9,7 +9,6 @@ export default function ForgetPassword() {
   const { messages: t } = useLanguage()
   const [email, setEmail] = useState('')
   const [message, setMessage] = useState('')
-  const [resetUrl, setResetUrl] = useState('')
   const [isError, setIsError] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
 
@@ -17,7 +16,6 @@ export default function ForgetPassword() {
     try {
       setIsLoading(true)
       setMessage('')
-      setResetUrl('')
       setIsError(false)
 
       if (!email.trim()) {
@@ -43,7 +41,6 @@ export default function ForgetPassword() {
       }
 
       setMessage(data.message ?? t.forgotPassword.demoNotice)
-      setResetUrl(data.resetUrl ?? '')
     } catch {
       setIsError(true)
       setMessage(t.forgotPassword.requestFailed)
@@ -79,14 +76,6 @@ export default function ForgetPassword() {
       </button>
 
       {message && <p className={`text-center text-sm ${isError ? 'text-[#b23a3a]' : 'text-[#2f6d43]'}`}>{message}</p>}
-      {resetUrl && (
-        <Link
-          href={resetUrl}
-          className="block text-center text-sm font-semibold text-[#1d3124] underline underline-offset-4"
-        >
-          Open reset link
-        </Link>
-      )}
     </AuthShell>
   )
 }
