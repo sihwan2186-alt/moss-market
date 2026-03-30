@@ -30,10 +30,6 @@ export default function HomePageContent({ products, source, isLoggedIn }: HomePa
         <section className="rounded-[40px] bg-[radial-gradient(circle_at_top_left,_rgba(108,148,123,0.35),_transparent_38%),linear-gradient(135deg,_#efe5d6_0%,_#f8f2ea_48%,_#e4ecdf_100%)] p-8 shadow-[0_25px_80px_rgba(23,31,26,0.08)] lg:p-12">
           <div className="max-w-4xl">
             <p className="text-sm font-semibold uppercase tracking-[0.35em] text-[#577363]">{t.home.eyebrow}</p>
-            <h1 className="mt-4 max-w-xl text-5xl font-black leading-[1.02] tracking-tight text-[#152117]">
-              {t.home.title}
-            </h1>
-            <p className="mt-6 max-w-2xl text-lg leading-8 text-[#49584c]">{t.home.description}</p>
             <div className="mt-8 flex flex-wrap gap-3">
               {!isLoggedIn && (
                 <a
