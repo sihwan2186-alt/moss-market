@@ -1,3 +1,4 @@
+import mongoose from 'mongoose'
 import Cart from '@/db/models/cart'
 import Order from '@/db/models/order'
 import Product from '@/db/models/product'
@@ -12,6 +13,7 @@ import {
   updateLocalProductStock,
 } from '@/lib/dev-store'
 import { parseOptionalJsonBody } from '@/lib/json-body'
+import { withLocalStoreLock } from '@/lib/local-store-lock'
 import { getErrorMessage, logServerError } from '@/lib/server-error'
 import { getAuthUser } from '@/lib/session'
 import { NextRequest, NextResponse } from 'next/server'
@@ -60,7 +62,11 @@ function isValidEmail(email: string) {
 }
 
 function isKnownCheckoutError(message: string) {
-  return message === 'A cart item no longer exists.' || message.startsWith('Not enough stock is available for ')
+  return (
+    message === 'Your cart is empty.' ||
+    message === 'A cart item no longer exists.' ||
+    message.startsWith('Not enough stock is available for ')
+  )
 }
 
 function normalizeCheckoutDetails(body: CheckoutBody | null, fallbackEmail: string, fallbackName: string) {
@@ -165,67 +171,83 @@ export async function POST(request: NextRequest) {
 
   try {
     await dbConnect()
-
-    const cart = await Cart.findOne({ userId: authUser.userId })
-
-    if (!cart || cart.items.length === 0) {
-      return NextResponse.json({ message: 'Your cart is empty.' }, { status: 400 })
-    }
-
-    const productIds = cart.items.map((item) => item.productId)
-    const products = await Product.find({ _id: { $in: productIds } })
-    const productMap = new Map(products.map((product) => [product._id.toString(), product]))
-
-    const items = []
-
-    for (const item of cart.items) {
-      const product = productMap.get(item.productId.toString())
-
-      if (!product) {
-        return NextResponse.json({ message: 'A cart item no longer exists.' }, { status: 400 })
-      }
-
-      if (product.stock < item.quantity) {
-        return NextResponse.json({ message: `Not enough stock is available for ${product.name}.` }, { status: 400 })
-      }
-
-      items.push({
-        productId: product._id,
-        name: product.name,
-        price: product.price,
-        quantity: item.quantity,
-        image: product.images[0] ?? '',
-      })
-    }
-
-    const totalPrice = items.reduce((sum, item) => sum + item.price * item.quantity, 0)
-
-    for (const item of cart.items) {
-      await Product.findByIdAndUpdate(item.productId, { $inc: { stock: -item.quantity } })
-    }
-
-    let order
+    const session = await mongoose.startSession()
+    let orderId = ''
 
     try {
-      order = await Order.create({
-        userId: authUser.userId,
-        items,
-        totalPrice,
-        status: 'paid',
-        ...normalizedCheckout.data,
-      })
-    } catch (error) {
-      for (const item of cart.items) {
-        await Product.findByIdAndUpdate(item.productId, { $inc: { stock: item.quantity } })
-      }
+      await session.withTransaction(async () => {
+        const cart = await Cart.findOne({ userId: authUser.userId }).session(session)
 
-      throw error
+        if (!cart || cart.items.length === 0) {
+          throw new Error('Your cart is empty.')
+        }
+
+        const productIds = cart.items.map((item) => item.productId)
+        const products = await Product.find({ _id: { $in: productIds } }).session(session)
+        const productMap = new Map(products.map((product) => [product._id.toString(), product]))
+        const items: Array<{
+          productId: mongoose.Types.ObjectId
+          name: string
+          price: number
+          quantity: number
+          image: string
+        }> = []
+
+        for (const item of cart.items) {
+          const product = productMap.get(item.productId.toString())
+
+          if (!product) {
+            throw new Error('A cart item no longer exists.')
+          }
+
+          if (product.stock < item.quantity) {
+            throw new Error(`Not enough stock is available for ${product.name}.`)
+          }
+
+          items.push({
+            productId: product._id,
+            name: product.name,
+            price: product.price,
+            quantity: item.quantity,
+            image: product.images[0] ?? '',
+          })
+        }
+
+        for (const item of items) {
+          const result = await Product.updateOne(
+            { _id: item.productId, stock: { $gte: item.quantity } },
+            { $inc: { stock: -item.quantity } },
+            { session }
+          )
+
+          if (result.modifiedCount !== 1) {
+            throw new Error(`Not enough stock is available for ${item.name}.`)
+          }
+        }
+
+        const totalPrice = items.reduce((sum, item) => sum + item.price * item.quantity, 0)
+        const [order] = await Order.create(
+          [
+            {
+              userId: authUser.userId,
+              items,
+              totalPrice,
+              status: 'paid',
+              ...normalizedCheckout.data,
+            },
+          ],
+          { session }
+        )
+
+        cart.items = []
+        await cart.save({ session })
+        orderId = order._id.toString()
+      })
+    } finally {
+      await session.endSession()
     }
 
-    cart.items = []
-    await cart.save()
-
-    return NextResponse.json({ message: 'Order created successfully.', orderId: order._id.toString() }, { status: 201 })
+    return NextResponse.json({ message: 'Order created successfully.', orderId }, { status: 201 })
   } catch (error) {
     const message = getErrorMessage(error)
 
@@ -238,72 +260,79 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: 'Failed to create order.' }, { status: 500 })
     }
 
-    let cart = await getLocalCart(authUser.userId)
+    return withLocalStoreLock(async () => {
+      let cart = await getLocalCart(authUser.userId)
 
-    if (!cart) {
-      cart = await createEmptyLocalCart(authUser.userId)
-    }
-
-    if (cart.items.length === 0) {
-      return NextResponse.json({ message: 'Your cart is empty.' }, { status: 400 })
-    }
-
-    const products = await getLocalProducts()
-    const productMap = new Map(products.map((product) => [product._id, product]))
-
-    const items = []
-
-    for (const item of cart.items) {
-      const product = productMap.get(item.productId)
-
-      if (!product) {
-        return NextResponse.json({ message: 'A cart item no longer exists.' }, { status: 400 })
+      if (!cart) {
+        cart = await createEmptyLocalCart(authUser.userId)
       }
 
-      if (product.stock < item.quantity) {
-        return NextResponse.json({ message: `Not enough stock is available for ${product.name}.` }, { status: 400 })
+      if (cart.items.length === 0) {
+        return NextResponse.json({ message: 'Your cart is empty.' }, { status: 400 })
       }
 
-      items.push({
-        productId: product._id,
-        name: product.name,
-        price: product.price,
-        quantity: item.quantity,
-        image: product.images[0] ?? '',
-      })
-    }
+      const products = await getLocalProducts()
+      const productMap = new Map(products.map((product) => [product._id, product]))
+      const items: Array<{
+        productId: string
+        name: string
+        price: number
+        quantity: number
+        image: string
+      }> = []
 
-    const totalPrice = items.reduce((sum, item) => sum + item.price * item.quantity, 0)
-
-    for (const item of cart.items) {
-      await updateLocalProductStock(item.productId, -item.quantity)
-    }
-
-    let order
-
-    try {
-      order = await createLocalOrder({
-        userId: authUser.userId,
-        items,
-        totalPrice,
-        status: 'paid',
-        ...normalizedCheckout.data,
-      })
-    } catch (error) {
       for (const item of cart.items) {
-        await updateLocalProductStock(item.productId, item.quantity)
+        const product = productMap.get(item.productId)
+
+        if (!product) {
+          return NextResponse.json({ message: 'A cart item no longer exists.' }, { status: 400 })
+        }
+
+        if (product.stock < item.quantity) {
+          return NextResponse.json({ message: `Not enough stock is available for ${product.name}.` }, { status: 400 })
+        }
+
+        items.push({
+          productId: product._id,
+          name: product.name,
+          price: product.price,
+          quantity: item.quantity,
+          image: product.images[0] ?? '',
+        })
       }
 
-      throw error
-    }
+      const totalPrice = items.reduce((sum, item) => sum + item.price * item.quantity, 0)
 
-    cart.items = []
-    cart.updatedAt = new Date().toISOString()
-    await saveLocalCart(cart)
+      for (const item of cart.items) {
+        await updateLocalProductStock(item.productId, -item.quantity)
+      }
 
-    return NextResponse.json(
-      { message: 'Order created successfully.', orderId: order.id, mode: 'local-fallback' },
-      { status: 201 }
-    )
+      let order
+
+      try {
+        order = await createLocalOrder({
+          userId: authUser.userId,
+          items,
+          totalPrice,
+          status: 'paid',
+          ...normalizedCheckout.data,
+        })
+
+        cart.items = []
+        cart.updatedAt = new Date().toISOString()
+        await saveLocalCart(cart)
+      } catch (error) {
+        for (const item of cart.items) {
+          await updateLocalProductStock(item.productId, item.quantity)
+        }
+
+        throw error
+      }
+
+      return NextResponse.json(
+        { message: 'Order created successfully.', orderId: order.id, mode: 'local-fallback' },
+        { status: 201 }
+      )
+    })
   }
 }
