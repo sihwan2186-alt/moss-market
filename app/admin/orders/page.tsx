@@ -10,6 +10,7 @@ import OrderStatusBadge from '@/components/OrderStatusBadge'
 import StoreHeader from '@/components/StoreHeader'
 import { formatDateTime } from '@/lib/i18n'
 import {
+  canEditShippingAddress,
   getOrderEffectiveTotal,
   getOrderRefundStatus,
   getOrderRefundedAmount,
@@ -66,7 +67,17 @@ type Feedback = {
   text: string
 }
 
+type ShippingForm = {
+  recipient: string
+  line1: string
+  line2: string
+  city: string
+  postalCode: string
+  country: string
+}
+
 const statusOptions = ['pending', 'paid', 'cancelled'] as const
+const shippingStatusOptions = ['preparing', 'shipped'] as const
 
 function formatAddress(shippingAddress?: ShippingAddressFields) {
   if (!shippingAddress) {
@@ -85,6 +96,17 @@ function formatAddress(shippingAddress?: ShippingAddressFields) {
     .join(', ')
 }
 
+function createShippingForm(shippingAddress?: ShippingAddressFields): ShippingForm {
+  return {
+    recipient: shippingAddress?.recipient ?? '',
+    line1: shippingAddress?.line1 ?? '',
+    line2: shippingAddress?.line2 ?? '',
+    city: shippingAddress?.city ?? '',
+    postalCode: shippingAddress?.postalCode ?? '',
+    country: shippingAddress?.country ?? '',
+  }
+}
+
 export default function AdminOrdersPage() {
   const { locale, messages: t } = useLanguage()
   const [orders, setOrders] = useState<AdminOrder[]>([])
@@ -93,6 +115,9 @@ export default function AdminOrdersPage() {
   const [user, setUser] = useState<SessionUser | null>(null)
   const [mode, setMode] = useState<'database' | 'local-fallback'>('database')
   const [statusUpdatingId, setStatusUpdatingId] = useState('')
+  const [shippingUpdatingId, setShippingUpdatingId] = useState('')
+  const [editingShippingOrderId, setEditingShippingOrderId] = useState('')
+  const [shippingForms, setShippingForms] = useState<Record<string, ShippingForm>>({})
   const [refundSubmittingId, setRefundSubmittingId] = useState('')
   const [refundSelections, setRefundSelections] = useState<Record<string, Record<number, string>>>({})
   const [refundReasons, setRefundReasons] = useState<Record<string, string>>({})
@@ -161,6 +186,56 @@ export default function AdminOrdersPage() {
             noRefundHistory: 'No refunds yet.',
             refundLocked: 'Fully refunded orders keep status changes disabled here.',
             customerLabel: 'Customer',
+          },
+    [locale]
+  )
+
+  const shippingCopy = useMemo(
+    () =>
+      locale === 'ko'
+        ? {
+            shippingActions: '배송 관리',
+            shippingAddressEditor: '배송지 수정',
+            shippingAddressHint: '배송 전 상태일 때만 배송지를 수정할 수 있습니다.',
+            addressLocked: '이미 출발 처리된 주문은 배송지 수정이 잠깁니다.',
+            preparing: '배송 전',
+            shipped: '출발 완료',
+            shippingUpdating: '배송 정보 저장 중...',
+            editAddress: '배송지 수정',
+            addAddress: '배송지 입력',
+            saveAddress: '배송지 저장',
+            cancelEdit: '닫기',
+            recipient: '수령인',
+            line1: '기본 주소',
+            line2: '상세 주소',
+            city: '도시',
+            postalCode: '우편번호',
+            country: '국가',
+            selectRefundFirst: '환불할 품목 수량을 먼저 선택해 주세요.',
+            refundSaveFailed: '환불 처리에 실패했습니다.',
+            refundSaved: '환불이 저장되었습니다.',
+          }
+        : {
+            shippingActions: 'Shipping controls',
+            shippingAddressEditor: 'Shipping address',
+            shippingAddressHint: 'You can edit the shipping address only before the parcel leaves.',
+            addressLocked: 'Shipping address edits are locked after departure.',
+            preparing: 'Preparing shipment',
+            shipped: 'Shipped',
+            shippingUpdating: 'Saving shipping details...',
+            editAddress: 'Edit address',
+            addAddress: 'Add address',
+            saveAddress: 'Save address',
+            cancelEdit: 'Close',
+            recipient: 'Recipient',
+            line1: 'Address line 1',
+            line2: 'Address line 2',
+            city: 'City',
+            postalCode: 'Postal code',
+            country: 'Country',
+            selectRefundFirst: 'Select at least one item quantity to refund.',
+            refundSaveFailed: 'Failed to save refund.',
+            refundSaved: 'Refund saved.',
           },
     [locale]
   )
@@ -241,6 +316,105 @@ export default function AdminOrdersPage() {
     }
   }
 
+  const openShippingEditor = (orderId: string, shippingAddress?: ShippingAddressFields) => {
+    setEditingShippingOrderId(orderId)
+    setShippingForms((current) => ({
+      ...current,
+      [orderId]: createShippingForm(shippingAddress),
+    }))
+  }
+
+  const handleShippingFormChange = (orderId: string, field: keyof ShippingForm, value: string) => {
+    setShippingForms((current) => ({
+      ...current,
+      [orderId]: {
+        ...(current[orderId] ?? createShippingForm()),
+        [field]: value,
+      },
+    }))
+  }
+
+  const handleShippingStatusChange = async (orderId: string, nextStatus: (typeof shippingStatusOptions)[number]) => {
+    try {
+      setShippingUpdatingId(orderId)
+      setFeedback(null)
+
+      const response = await fetch(`/api/admin/orders/${orderId}/shipping`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ shippingStatus: nextStatus }),
+      })
+      const data = await response.json()
+
+      if (!response.ok) {
+        setFeedback({
+          tone: 'error',
+          text: data.message ?? t.adminOrders.loadFailed,
+        })
+        return
+      }
+
+      if (nextStatus === 'shipped') {
+        setEditingShippingOrderId('')
+      }
+
+      await loadOrders()
+      setFeedback({
+        tone: 'success',
+        text: data.message ?? 'Shipping status updated.',
+      })
+    } catch {
+      setFeedback({
+        tone: 'error',
+        text: t.adminOrders.loadFailed,
+      })
+    } finally {
+      setShippingUpdatingId('')
+    }
+  }
+
+  const handleShippingAddressSave = async (orderId: string) => {
+    const shippingAddress = shippingForms[orderId] ?? createShippingForm()
+
+    try {
+      setShippingUpdatingId(orderId)
+      setFeedback(null)
+
+      const response = await fetch(`/api/admin/orders/${orderId}/shipping`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ shippingAddress }),
+      })
+      const data = await response.json()
+
+      if (!response.ok) {
+        setFeedback({
+          tone: 'error',
+          text: data.message ?? t.adminOrders.loadFailed,
+        })
+        return
+      }
+
+      await loadOrders()
+      setEditingShippingOrderId('')
+      setFeedback({
+        tone: 'success',
+        text: data.message ?? 'Shipping address updated.',
+      })
+    } catch {
+      setFeedback({
+        tone: 'error',
+        text: t.adminOrders.loadFailed,
+      })
+    } finally {
+      setShippingUpdatingId('')
+    }
+  }
+
   const handleRefundQuantityChange = (orderId: string, itemIndex: number, value: string) => {
     if (!/^\d*$/.test(value)) {
       return
@@ -280,8 +454,7 @@ export default function AdminOrdersPage() {
     if (items.length === 0) {
       setFeedback({
         tone: 'error',
-        text:
-          locale === 'ko' ? '환불할 품목 수량을 먼저 선택해 주세요.' : 'Select at least one item quantity to refund.',
+        text: shippingCopy.selectRefundFirst,
       })
       return
     }
@@ -305,7 +478,7 @@ export default function AdminOrdersPage() {
       if (!response.ok) {
         setFeedback({
           tone: 'error',
-          text: data.message ?? (locale === 'ko' ? '환불 처리에 실패했습니다.' : 'Failed to save refund.'),
+          text: data.message ?? shippingCopy.refundSaveFailed,
         })
         return
       }
@@ -321,12 +494,12 @@ export default function AdminOrdersPage() {
       }))
       setFeedback({
         tone: 'success',
-        text: data.message ?? (locale === 'ko' ? '환불이 저장되었습니다.' : 'Refund saved.'),
+        text: data.message ?? shippingCopy.refundSaved,
       })
     } catch {
       setFeedback({
         tone: 'error',
-        text: locale === 'ko' ? '환불 처리에 실패했습니다.' : 'Failed to save refund.',
+        text: shippingCopy.refundSaveFailed,
       })
     } finally {
       setRefundSubmittingId('')
@@ -432,6 +605,9 @@ export default function AdminOrdersPage() {
                   const refundableItems = getRefundableOrderItems(order)
                   const hasRefundableItems = refundableItems.some((item) => item.remainingQuantity > 0)
                   const refundHistory = order.refunds ?? []
+                  const shippingEditable = canEditShippingAddress(order)
+                  const isEditingShipping = editingShippingOrderId === orderId
+                  const shippingForm = shippingForms[orderId] ?? createShippingForm(order.shippingAddress)
 
                   return (
                     <article
@@ -474,9 +650,23 @@ export default function AdminOrdersPage() {
                           <p className="mt-2 text-sm text-[#5d6a61]">{contactEmail}</p>
                         </div>
                         <div className="rounded-[24px] bg-[#faf7f1] p-4">
-                          <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#68806f]">
-                            {copy.shipping}
-                          </p>
+                          <div className="flex items-start justify-between gap-3">
+                            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#68806f]">
+                              {copy.shipping}
+                            </p>
+                            {shippingEditable ? (
+                              <button
+                                type="button"
+                                onClick={() => openShippingEditor(orderId, order.shippingAddress)}
+                                disabled={shippingUpdatingId === orderId}
+                                className="text-sm font-semibold text-[#1d3124] underline underline-offset-4 disabled:opacity-40"
+                              >
+                                {shippingLabel ? shippingCopy.editAddress : shippingCopy.addAddress}
+                              </button>
+                            ) : (
+                              <span className="text-xs font-semibold text-[#8a5a14]">{shippingCopy.addressLocked}</span>
+                            )}
+                          </div>
                           <p className="mt-3 text-sm leading-6 text-[#425247]">{shippingLabel || copy.noShipping}</p>
                         </div>
                         <div className="rounded-[24px] bg-[#faf7f1] p-4">
@@ -490,6 +680,132 @@ export default function AdminOrdersPage() {
                             {copy.note}
                           </p>
                           <p className="mt-2 text-sm leading-6 text-[#425247]">{order.note || copy.noNote}</p>
+                        </div>
+                      </div>
+
+                      <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+                        <div className="rounded-[24px] border border-black/5 bg-[#faf7f1] p-4">
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#68806f]">
+                              {shippingCopy.shippingActions}
+                            </p>
+                            {shippingUpdatingId === orderId && (
+                              <p className="text-sm font-semibold text-[#8a5a14]">{shippingCopy.shippingUpdating}</p>
+                            )}
+                          </div>
+                          <div className="mt-4 flex flex-wrap gap-2">
+                            {shippingStatusOptions.map((status) => (
+                              <button
+                                key={status}
+                                type="button"
+                                onClick={() => void handleShippingStatusChange(orderId, status)}
+                                disabled={shippingUpdatingId === orderId || order.shippingStatus === status}
+                                className={`rounded-full px-4 py-2 text-sm font-semibold ${
+                                  order.shippingStatus === status
+                                    ? 'bg-[#1d3124] text-white'
+                                    : 'border border-black/10 bg-white text-[#314338]'
+                                } disabled:cursor-not-allowed disabled:opacity-60`}
+                              >
+                                {shippingCopy[status]}
+                              </button>
+                            ))}
+                          </div>
+                          {!shippingEditable && (
+                            <p className="mt-3 text-sm text-[#8a5a14]">{shippingCopy.addressLocked}</p>
+                          )}
+                        </div>
+
+                        <div className="rounded-[24px] border border-black/5 bg-[#faf7f1] p-4">
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                              <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#68806f]">
+                                {shippingCopy.shippingAddressEditor}
+                              </p>
+                              <p className="mt-2 text-sm text-[#5d6a61]">{shippingCopy.shippingAddressHint}</p>
+                            </div>
+                            {isEditingShipping && (
+                              <button
+                                type="button"
+                                onClick={() => setEditingShippingOrderId('')}
+                                className="text-sm font-semibold text-[#1d3124] underline underline-offset-4"
+                              >
+                                {shippingCopy.cancelEdit}
+                              </button>
+                            )}
+                          </div>
+
+                          {shippingEditable ? (
+                            isEditingShipping ? (
+                              <>
+                                <div className="mt-4 grid gap-3 md:grid-cols-2">
+                                  <input
+                                    value={shippingForm.recipient}
+                                    onChange={(event) =>
+                                      handleShippingFormChange(orderId, 'recipient', event.target.value)
+                                    }
+                                    placeholder={shippingCopy.recipient}
+                                    disabled={shippingUpdatingId === orderId}
+                                    className="rounded-2xl border border-black/10 bg-white px-4 py-3 outline-none disabled:opacity-50"
+                                  />
+                                  <input
+                                    value={shippingForm.city}
+                                    onChange={(event) => handleShippingFormChange(orderId, 'city', event.target.value)}
+                                    placeholder={shippingCopy.city}
+                                    disabled={shippingUpdatingId === orderId}
+                                    className="rounded-2xl border border-black/10 bg-white px-4 py-3 outline-none disabled:opacity-50"
+                                  />
+                                  <input
+                                    value={shippingForm.line1}
+                                    onChange={(event) => handleShippingFormChange(orderId, 'line1', event.target.value)}
+                                    placeholder={shippingCopy.line1}
+                                    disabled={shippingUpdatingId === orderId}
+                                    className="rounded-2xl border border-black/10 bg-white px-4 py-3 outline-none disabled:opacity-50 md:col-span-2"
+                                  />
+                                  <input
+                                    value={shippingForm.line2}
+                                    onChange={(event) => handleShippingFormChange(orderId, 'line2', event.target.value)}
+                                    placeholder={shippingCopy.line2}
+                                    disabled={shippingUpdatingId === orderId}
+                                    className="rounded-2xl border border-black/10 bg-white px-4 py-3 outline-none disabled:opacity-50 md:col-span-2"
+                                  />
+                                  <input
+                                    value={shippingForm.postalCode}
+                                    onChange={(event) =>
+                                      handleShippingFormChange(orderId, 'postalCode', event.target.value)
+                                    }
+                                    placeholder={shippingCopy.postalCode}
+                                    disabled={shippingUpdatingId === orderId}
+                                    className="rounded-2xl border border-black/10 bg-white px-4 py-3 outline-none disabled:opacity-50"
+                                  />
+                                  <input
+                                    value={shippingForm.country}
+                                    onChange={(event) =>
+                                      handleShippingFormChange(orderId, 'country', event.target.value)
+                                    }
+                                    placeholder={shippingCopy.country}
+                                    disabled={shippingUpdatingId === orderId}
+                                    className="rounded-2xl border border-black/10 bg-white px-4 py-3 outline-none disabled:opacity-50"
+                                  />
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => void handleShippingAddressSave(orderId)}
+                                  disabled={shippingUpdatingId === orderId}
+                                  className="mt-4 rounded-full bg-[#1d3124] px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                  {shippingUpdatingId === orderId
+                                    ? shippingCopy.shippingUpdating
+                                    : shippingCopy.saveAddress}
+                                </button>
+                              </>
+                            ) : (
+                              <div className="mt-4 rounded-[20px] border border-black/5 bg-white p-4 text-sm text-[#5d6a61]">
+                                {shippingCopy.shippingAddressHint}
+                              </div>
+                            )
+                          ) : (
+                            <p className="mt-4 text-sm text-[#8a5a14]">{shippingCopy.addressLocked}</p>
+                          )}
                         </div>
                       </div>
 
