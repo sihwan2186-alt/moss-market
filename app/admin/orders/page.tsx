@@ -3,20 +3,30 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import RefundStatusBadge from '@/components/RefundStatusBadge'
+import ShippingStatusBadge from '@/components/ShippingStatusBadge'
 import { useLanguage } from '@/components/LanguageProvider'
-import { formatDateTime } from '@/lib/i18n'
 import OrderStatusBadge from '@/components/OrderStatusBadge'
 import StoreHeader from '@/components/StoreHeader'
+import { formatDateTime } from '@/lib/i18n'
+import {
+  getOrderEffectiveTotal,
+  getOrderRefundStatus,
+  getOrderRefundedAmount,
+  getRefundableOrderItems,
+  type OrderRefundSelection,
+  type RefundRecord,
+  type ShippingAddressFields,
+} from '@/lib/order-utils'
 import { translateProductName } from '@/lib/sample-products'
 
-type ShippingAddress = {
-  recipient?: string
-  line1?: string
-  line2?: string
-  city?: string
-  postalCode?: string
-  country?: string
-} | null
+type AdminOrderItem = {
+  productId?: string
+  name: string
+  quantity: number
+  price: number
+  image: string
+}
 
 type AdminOrder = {
   _id?: string
@@ -26,15 +36,12 @@ type AdminOrder = {
   createdAt: string
   customerName?: string
   contactEmail?: string
-  shippingAddress?: ShippingAddress
+  shippingAddress?: ShippingAddressFields
+  shippingStatus?: string
   note?: string
   paymentLast4?: string
-  items: Array<{
-    name: string
-    quantity: number
-    price: number
-    image: string
-  }>
+  refunds?: RefundRecord[]
+  items: AdminOrderItem[]
   user?: {
     email?: string
     name?: string
@@ -61,7 +68,7 @@ type Feedback = {
 
 const statusOptions = ['pending', 'paid', 'cancelled'] as const
 
-function formatAddress(shippingAddress?: ShippingAddress) {
+function formatAddress(shippingAddress?: ShippingAddressFields) {
   if (!shippingAddress) {
     return ''
   }
@@ -86,6 +93,9 @@ export default function AdminOrdersPage() {
   const [user, setUser] = useState<SessionUser | null>(null)
   const [mode, setMode] = useState<'database' | 'local-fallback'>('database')
   const [statusUpdatingId, setStatusUpdatingId] = useState('')
+  const [refundSubmittingId, setRefundSubmittingId] = useState('')
+  const [refundSelections, setRefundSelections] = useState<Record<string, Record<number, string>>>({})
+  const [refundReasons, setRefundReasons] = useState<Record<string, string>>({})
 
   const copy = useMemo(
     () =>
@@ -104,8 +114,22 @@ export default function AdminOrdersPage() {
             paid: '결제 완료',
             cancelled: '취소',
             updating: '상태 저장 중...',
-            totalLabel: '총액',
-            shippingRecipient: '수령인',
+            totalLabel: '실결제',
+            originalTotal: '원주문 금액',
+            refundedTotal: '누적 환불',
+            refundSection: '환불 처리',
+            refundReason: '환불 사유',
+            refundReasonPlaceholder: '선택 사항입니다. 환불 메모를 남길 수 있습니다.',
+            refundQuantity: '환불 수량',
+            refundable: '환불 가능',
+            refundedQuantity: '환불 완료',
+            refundAction: '선택 품목 환불',
+            refunding: '환불 처리 중...',
+            noRefundableItems: '더 이상 환불 가능한 수량이 없습니다.',
+            refundHistory: '환불 이력',
+            noRefundHistory: '환불 이력이 없습니다.',
+            refundLocked: '전액 환불된 주문은 상태 변경을 잠시 막아두었습니다.',
+            customerLabel: '고객',
           }
         : {
             refresh: 'Refresh',
@@ -121,8 +145,22 @@ export default function AdminOrdersPage() {
             paid: 'Paid',
             cancelled: 'Cancelled',
             updating: 'Saving status...',
-            totalLabel: 'Total',
-            shippingRecipient: 'Recipient',
+            totalLabel: 'Net total',
+            originalTotal: 'Original total',
+            refundedTotal: 'Refunded',
+            refundSection: 'Refund items',
+            refundReason: 'Refund note',
+            refundReasonPlaceholder: 'Optional. Add a short note for this refund.',
+            refundQuantity: 'Refund quantity',
+            refundable: 'Refundable',
+            refundedQuantity: 'Refunded',
+            refundAction: 'Refund selected items',
+            refunding: 'Saving refund...',
+            noRefundableItems: 'There are no refundable quantities left in this order.',
+            refundHistory: 'Refund history',
+            noRefundHistory: 'No refunds yet.',
+            refundLocked: 'Fully refunded orders keep status changes disabled here.',
+            customerLabel: 'Customer',
           },
     [locale]
   )
@@ -203,6 +241,98 @@ export default function AdminOrdersPage() {
     }
   }
 
+  const handleRefundQuantityChange = (orderId: string, itemIndex: number, value: string) => {
+    if (!/^\d*$/.test(value)) {
+      return
+    }
+
+    setRefundSelections((current) => ({
+      ...current,
+      [orderId]: {
+        ...(current[orderId] ?? {}),
+        [itemIndex]: value,
+      },
+    }))
+  }
+
+  const handleRefund = async (order: AdminOrder) => {
+    const orderId = order._id ?? order.id ?? ''
+
+    if (!orderId) {
+      return
+    }
+
+    const items: OrderRefundSelection[] = Object.entries(refundSelections[orderId] ?? {}).reduce<
+      OrderRefundSelection[]
+    >((result, [itemIndex, quantityValue]) => {
+      const quantity = Number.parseInt(quantityValue, 10)
+
+      if (quantity > 0) {
+        result.push({
+          itemIndex: Number(itemIndex),
+          quantity,
+        })
+      }
+
+      return result
+    }, [])
+
+    if (items.length === 0) {
+      setFeedback({
+        tone: 'error',
+        text:
+          locale === 'ko' ? '환불할 품목 수량을 먼저 선택해 주세요.' : 'Select at least one item quantity to refund.',
+      })
+      return
+    }
+
+    try {
+      setRefundSubmittingId(orderId)
+      setFeedback(null)
+
+      const response = await fetch(`/api/admin/orders/${orderId}/refund`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          items,
+          reason: refundReasons[orderId] ?? '',
+        }),
+      })
+      const data = await response.json()
+
+      if (!response.ok) {
+        setFeedback({
+          tone: 'error',
+          text: data.message ?? (locale === 'ko' ? '환불 처리에 실패했습니다.' : 'Failed to save refund.'),
+        })
+        return
+      }
+
+      await loadOrders()
+      setRefundSelections((current) => ({
+        ...current,
+        [orderId]: {},
+      }))
+      setRefundReasons((current) => ({
+        ...current,
+        [orderId]: '',
+      }))
+      setFeedback({
+        tone: 'success',
+        text: data.message ?? (locale === 'ko' ? '환불이 저장되었습니다.' : 'Refund saved.'),
+      })
+    } catch {
+      setFeedback({
+        tone: 'error',
+        text: locale === 'ko' ? '환불 처리에 실패했습니다.' : 'Failed to save refund.',
+      })
+    } finally {
+      setRefundSubmittingId('')
+    }
+  }
+
   const isAdmin = user?.role === 'admin'
 
   return (
@@ -264,7 +394,7 @@ export default function AdminOrdersPage() {
                   {t.adminOrders.revenue}
                 </p>
                 <p className="mt-3 text-3xl font-black">
-                  ${orders.reduce((sum, order) => sum + order.totalPrice, 0).toFixed(2)}
+                  ${orders.reduce((sum, order) => sum + getOrderEffectiveTotal(order), 0).toFixed(2)}
                 </p>
               </div>
               <div className="rounded-[24px] bg-white p-5 shadow-[0_18px_60px_rgba(17,24,39,0.08)]">
@@ -296,6 +426,12 @@ export default function AdminOrdersPage() {
                   const shippingLabel = formatAddress(order.shippingAddress)
                   const customerLabel = order.customerName || orderUser?.name || t.adminOrders.unknown
                   const contactEmail = order.contactEmail || orderUser?.email || t.adminOrders.unknown
+                  const refundStatus = getOrderRefundStatus(order)
+                  const refundedAmount = getOrderRefundedAmount(order)
+                  const effectiveTotal = getOrderEffectiveTotal(order)
+                  const refundableItems = getRefundableOrderItems(order)
+                  const hasRefundableItems = refundableItems.some((item) => item.remainingQuantity > 0)
+                  const refundHistory = order.refunds ?? []
 
                   return (
                     <article
@@ -309,14 +445,23 @@ export default function AdminOrdersPage() {
                           </p>
                           <p className="mt-2 text-sm text-[#5d6a61]">{formatDateTime(locale, order.createdAt)}</p>
                           <p className="mt-2 text-sm text-[#425247]">
-                            {t.adminOrders.customer}: {customerLabel} ({contactEmail})
+                            {copy.customerLabel}: {customerLabel} ({contactEmail})
                           </p>
                         </div>
                         <div className="text-right">
-                          <OrderStatusBadge status={order.status} />
+                          <div className="flex flex-wrap justify-end gap-2">
+                            <OrderStatusBadge status={order.status} />
+                            <ShippingStatusBadge status={order.shippingStatus} />
+                            <RefundStatusBadge status={refundStatus} />
+                          </div>
                           <p className="mt-3 text-lg font-bold">
-                            {copy.totalLabel} ${order.totalPrice.toFixed(2)}
+                            {copy.totalLabel} ${effectiveTotal.toFixed(2)}
                           </p>
+                          {refundedAmount > 0 && (
+                            <p className="mt-1 text-sm font-semibold text-[#8a5a14]">
+                              {copy.refundedTotal} -${refundedAmount.toFixed(2)}
+                            </p>
+                          )}
                         </div>
                       </div>
 
@@ -348,9 +493,32 @@ export default function AdminOrdersPage() {
                         </div>
                       </div>
 
+                      {refundedAmount > 0 && (
+                        <div className="mt-5 grid gap-4 rounded-[24px] border border-[#f0d9ba] bg-[#fff8ef] p-4 md:grid-cols-3">
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#8a5a14]">
+                              {copy.originalTotal}
+                            </p>
+                            <p className="mt-2 text-lg font-bold">${order.totalPrice.toFixed(2)}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#8a5a14]">
+                              {copy.refundedTotal}
+                            </p>
+                            <p className="mt-2 text-lg font-bold text-[#8a5a14]">-${refundedAmount.toFixed(2)}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#8a5a14]">
+                              {copy.totalLabel}
+                            </p>
+                            <p className="mt-2 text-lg font-bold">${effectiveTotal.toFixed(2)}</p>
+                          </div>
+                        </div>
+                      )}
+
                       <div className="mt-5 space-y-3">
-                        {order.items.map((item, index) => (
-                          <div key={`${orderId}-${index}`} className="flex items-center gap-4">
+                        {refundableItems.map(({ item, itemIndex, refundedQuantity, remainingQuantity }) => (
+                          <div key={`${orderId}-${itemIndex}`} className="flex items-center gap-4">
                             <Image
                               src={item.image}
                               alt={translateProductName(item.name, locale)}
@@ -362,6 +530,10 @@ export default function AdminOrdersPage() {
                               <p className="font-semibold">{translateProductName(item.name, locale)}</p>
                               <p className="text-sm text-[#5d6a61]">
                                 {t.orders.quantity} {item.quantity}
+                              </p>
+                              <p className="text-sm text-[#8a5a14]">
+                                {copy.refundable} {remainingQuantity}
+                                {refundedQuantity > 0 ? ` · ${copy.refundedQuantity} ${refundedQuantity}` : ''}
                               </p>
                             </div>
                             <p className="font-semibold">${(item.price * item.quantity).toFixed(2)}</p>
@@ -378,7 +550,9 @@ export default function AdminOrdersPage() {
                             <button
                               key={status}
                               onClick={() => void handleStatusChange(orderId, status)}
-                              disabled={statusUpdatingId === orderId || order.status === status}
+                              disabled={
+                                statusUpdatingId === orderId || order.status === status || refundStatus === 'full'
+                              }
                               className={`rounded-full px-4 py-2 text-sm font-semibold ${
                                 order.status === status
                                   ? 'bg-[#1d3124] text-white'
@@ -391,6 +565,111 @@ export default function AdminOrdersPage() {
                                 : copy[status as keyof typeof copy]}
                             </button>
                           ))}
+                        </div>
+                        {refundStatus === 'full' && <p className="mt-3 text-sm text-[#8a5a14]">{copy.refundLocked}</p>}
+                      </div>
+
+                      <div className="mt-6 rounded-[24px] border border-black/5 bg-[#faf7f1] p-4">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#68806f]">
+                            {copy.refundSection}
+                          </p>
+                          {refundSubmittingId === orderId && (
+                            <p className="text-sm font-semibold text-[#8a5a14]">{copy.refunding}</p>
+                          )}
+                        </div>
+
+                        {hasRefundableItems ? (
+                          <>
+                            <div className="mt-4 space-y-3">
+                              {refundableItems.map(({ item, itemIndex, remainingQuantity }) => (
+                                <label
+                                  key={`${orderId}-refund-${itemIndex}`}
+                                  className="flex flex-wrap items-center justify-between gap-3 rounded-[20px] border border-black/5 bg-white px-4 py-3"
+                                >
+                                  <div>
+                                    <p className="font-semibold">{translateProductName(item.name, locale)}</p>
+                                    <p className="text-sm text-[#5d6a61]">
+                                      {copy.refundable} {remainingQuantity}
+                                    </p>
+                                  </div>
+                                  <div className="flex items-center gap-3">
+                                    <span className="text-sm text-[#5d6a61]">{copy.refundQuantity}</span>
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      max={remainingQuantity}
+                                      value={refundSelections[orderId]?.[itemIndex] ?? ''}
+                                      onChange={(event) =>
+                                        handleRefundQuantityChange(orderId, itemIndex, event.target.value)
+                                      }
+                                      disabled={refundSubmittingId === orderId || remainingQuantity === 0}
+                                      className="w-24 rounded-2xl border border-black/10 bg-white px-4 py-2 outline-none disabled:opacity-50"
+                                    />
+                                  </div>
+                                </label>
+                              ))}
+                            </div>
+                            <label className="mt-4 block">
+                              <span className="text-sm font-semibold text-[#314338]">{copy.refundReason}</span>
+                              <textarea
+                                value={refundReasons[orderId] ?? ''}
+                                onChange={(event) =>
+                                  setRefundReasons((current) => ({
+                                    ...current,
+                                    [orderId]: event.target.value,
+                                  }))
+                                }
+                                rows={3}
+                                disabled={refundSubmittingId === orderId}
+                                placeholder={copy.refundReasonPlaceholder}
+                                className="mt-2 w-full rounded-[20px] border border-black/10 bg-white px-4 py-3 outline-none disabled:opacity-50"
+                              />
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() => void handleRefund(order)}
+                              disabled={refundSubmittingId === orderId}
+                              className="mt-4 rounded-full bg-[#1d3124] px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              {refundSubmittingId === orderId ? copy.refunding : copy.refundAction}
+                            </button>
+                          </>
+                        ) : (
+                          <p className="mt-4 text-sm text-[#5d6a61]">{copy.noRefundableItems}</p>
+                        )}
+
+                        <div className="mt-6 border-t border-black/5 pt-4">
+                          <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#68806f]">
+                            {copy.refundHistory}
+                          </p>
+                          {refundHistory.length === 0 ? (
+                            <p className="mt-3 text-sm text-[#5d6a61]">{copy.noRefundHistory}</p>
+                          ) : (
+                            <div className="mt-3 space-y-3">
+                              {refundHistory.map((refund) => (
+                                <div key={refund.id} className="rounded-[20px] border border-black/5 bg-white p-4">
+                                  <div className="flex flex-wrap items-center justify-between gap-3">
+                                    <p className="font-semibold text-[#18261d]">-${refund.amount.toFixed(2)}</p>
+                                    <p className="text-sm text-[#5d6a61]">
+                                      {formatDateTime(
+                                        locale,
+                                        typeof refund.createdAt === 'string'
+                                          ? refund.createdAt
+                                          : refund.createdAt.toISOString()
+                                      )}
+                                    </p>
+                                  </div>
+                                  <p className="mt-2 text-sm text-[#425247]">
+                                    {refund.items
+                                      .map((item) => `${translateProductName(item.name, locale)} x${item.quantity}`)
+                                      .join(', ')}
+                                  </p>
+                                  {refund.reason && <p className="mt-2 text-sm text-[#5d6a61]">{refund.reason}</p>}
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </article>

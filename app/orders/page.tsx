@@ -3,20 +3,21 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
+import RefundStatusBadge from '@/components/RefundStatusBadge'
+import ShippingStatusBadge from '@/components/ShippingStatusBadge'
 import { useLanguage } from '@/components/LanguageProvider'
-import { formatDate, formatDateTime } from '@/lib/i18n'
 import OrderStatusBadge from '@/components/OrderStatusBadge'
 import StoreHeader from '@/components/StoreHeader'
+import { formatDate, formatDateTime } from '@/lib/i18n'
+import {
+  getOrderEffectiveTotal,
+  getOrderRefundStatus,
+  getOrderRefundedAmount,
+  getRefundableOrderItems,
+  type RefundRecord,
+  type ShippingAddressFields,
+} from '@/lib/order-utils'
 import { translateProductName } from '@/lib/sample-products'
-
-type ShippingAddress = {
-  recipient?: string
-  line1?: string
-  line2?: string
-  city?: string
-  postalCode?: string
-  country?: string
-} | null
 
 type Order = {
   _id?: string
@@ -26,10 +27,13 @@ type Order = {
   createdAt: string
   customerName?: string
   contactEmail?: string
-  shippingAddress?: ShippingAddress
+  shippingAddress?: ShippingAddressFields
+  shippingStatus?: string
   note?: string
   paymentLast4?: string
+  refunds?: RefundRecord[]
   items: Array<{
+    productId?: string
     name: string
     quantity: number
     price: number
@@ -37,7 +41,7 @@ type Order = {
   }>
 }
 
-function formatAddress(shippingAddress?: ShippingAddress) {
+function formatAddress(shippingAddress?: ShippingAddressFields) {
   if (!shippingAddress) {
     return ''
   }
@@ -73,6 +77,9 @@ export default function OrdersPage() {
             noShipping: '배송지 정보 없음',
             noPayment: '테스트 결제 정보 없음',
             noNote: '메모 없음',
+            netTotal: '실결제',
+            refunded: '환불 금액',
+            refundable: '환불 완료',
           }
         : {
             contact: 'Contact',
@@ -82,6 +89,9 @@ export default function OrdersPage() {
             noShipping: 'No shipping address provided.',
             noPayment: 'No test card captured.',
             noNote: 'No note provided.',
+            netTotal: 'Net total',
+            refunded: 'Refunded',
+            refundable: 'Refunded quantity',
           },
     [locale]
   )
@@ -133,7 +143,7 @@ export default function OrdersPage() {
             <div className="rounded-[24px] bg-white p-5 shadow-[0_18px_60px_rgba(17,24,39,0.08)]">
               <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#68806f]">{t.orders.totalSpent}</p>
               <p className="mt-3 text-3xl font-black">
-                ${orders.reduce((sum, order) => sum + order.totalPrice, 0).toFixed(2)}
+                ${orders.reduce((sum, order) => sum + getOrderEffectiveTotal(order), 0).toFixed(2)}
               </p>
             </div>
             <div className="rounded-[24px] bg-white p-5 shadow-[0_18px_60px_rgba(17,24,39,0.08)]">
@@ -169,6 +179,10 @@ export default function OrdersPage() {
           {orders.map((order) => {
             const orderId = order._id ?? order.id ?? 'local-order'
             const shippingLabel = formatAddress(order.shippingAddress)
+            const refundedAmount = getOrderRefundedAmount(order)
+            const effectiveTotal = getOrderEffectiveTotal(order)
+            const refundStatus = getOrderRefundStatus(order)
+            const itemsWithRefunds = getRefundableOrderItems(order)
 
             return (
               <article key={orderId} className="rounded-[28px] bg-white p-6 shadow-[0_18px_60px_rgba(17,24,39,0.08)]">
@@ -181,7 +195,11 @@ export default function OrdersPage() {
                   </div>
                   <div className="text-right">
                     <p className="mb-2 text-sm uppercase tracking-[0.2em] text-[#68806f]">{t.orders.status}</p>
-                    <OrderStatusBadge status={order.status} />
+                    <div className="flex flex-wrap justify-end gap-2">
+                      <OrderStatusBadge status={order.status} />
+                      <ShippingStatusBadge status={order.shippingStatus} />
+                      <RefundStatusBadge status={refundStatus} />
+                    </div>
                   </div>
                 </div>
 
@@ -204,8 +222,8 @@ export default function OrdersPage() {
                 </div>
 
                 <div className="mt-5 space-y-4">
-                  {order.items.map((item, index) => (
-                    <div key={`${orderId}-${index}`} className="flex items-center gap-4">
+                  {itemsWithRefunds.map(({ item, itemIndex, refundedQuantity }) => (
+                    <div key={`${orderId}-${itemIndex}`} className="flex items-center gap-4">
                       <Image
                         src={item.image}
                         alt={translateProductName(item.name, locale)}
@@ -218,6 +236,11 @@ export default function OrdersPage() {
                         <p className="text-sm text-[#5d6a61]">
                           {t.orders.quantity} {item.quantity}
                         </p>
+                        {refundedQuantity > 0 && (
+                          <p className="text-sm text-[#8a5a14]">
+                            {copy.refundable} {refundedQuantity}
+                          </p>
+                        )}
                       </div>
                       <p className="font-semibold">${(item.price * item.quantity).toFixed(2)}</p>
                     </div>
@@ -228,6 +251,11 @@ export default function OrdersPage() {
                   <div className="max-w-2xl">
                     <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#68806f]">{copy.note}</p>
                     <p className="mt-2 text-sm leading-6 text-[#425247]">{order.note || copy.noNote}</p>
+                    {refundedAmount > 0 && (
+                      <p className="mt-3 text-sm font-semibold text-[#8a5a14]">
+                        {copy.refunded} -${refundedAmount.toFixed(2)}
+                      </p>
+                    )}
                   </div>
                   <div className="text-right">
                     <Link
@@ -237,7 +265,7 @@ export default function OrdersPage() {
                       {t.orders.viewDetails}
                     </Link>
                     <div className="mt-3 text-lg font-bold">
-                      {t.orders.total} ${order.totalPrice.toFixed(2)}
+                      {copy.netTotal} ${effectiveTotal.toFixed(2)}
                     </div>
                   </div>
                 </div>

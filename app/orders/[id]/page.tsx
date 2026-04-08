@@ -4,27 +4,29 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
+import RefundStatusBadge from '@/components/RefundStatusBadge'
+import ShippingStatusBadge from '@/components/ShippingStatusBadge'
 import { useLanguage } from '@/components/LanguageProvider'
-import { formatDateTime } from '@/lib/i18n'
 import OrderStatusBadge from '@/components/OrderStatusBadge'
 import StoreHeader from '@/components/StoreHeader'
+import { formatDateTime } from '@/lib/i18n'
+import {
+  getOrderEffectiveTotal,
+  getOrderRefundStatus,
+  getOrderRefundedAmount,
+  getRefundableOrderItems,
+  type RefundRecord,
+  type ShippingAddressFields,
+} from '@/lib/order-utils'
 import { translateProductName } from '@/lib/sample-products'
 
 type OrderItem = {
+  productId?: string
   image: string
   name: string
   quantity: number
   price: number
 }
-
-type ShippingAddress = {
-  recipient?: string
-  line1?: string
-  line2?: string
-  city?: string
-  postalCode?: string
-  country?: string
-} | null
 
 type Order = {
   _id?: string
@@ -34,13 +36,15 @@ type Order = {
   createdAt: string
   customerName?: string
   contactEmail?: string
-  shippingAddress?: ShippingAddress
+  shippingAddress?: ShippingAddressFields
+  shippingStatus?: string
   note?: string
   paymentLast4?: string
+  refunds?: RefundRecord[]
   items: OrderItem[]
 }
 
-function formatAddress(shippingAddress?: ShippingAddress) {
+function formatAddress(shippingAddress?: ShippingAddressFields) {
   if (!shippingAddress) {
     return ''
   }
@@ -78,6 +82,12 @@ export default function OrderDetailPage() {
             noShipping: '배송지 정보 없음',
             noPayment: '테스트 결제 정보 없음',
             noNote: '메모 없음',
+            originalTotal: '원주문 금액',
+            refundedTotal: '누적 환불',
+            netTotal: '실결제 금액',
+            refundHistory: '환불 이력',
+            noRefundHistory: '환불 이력이 없습니다.',
+            refundedQuantity: '환불 완료',
           }
         : {
             contact: 'Contact',
@@ -87,6 +97,12 @@ export default function OrderDetailPage() {
             noShipping: 'No shipping address provided.',
             noPayment: 'No test card captured.',
             noNote: 'No note provided.',
+            originalTotal: 'Original total',
+            refundedTotal: 'Refunded',
+            netTotal: 'Net charged',
+            refundHistory: 'Refund history',
+            noRefundHistory: 'No refunds yet.',
+            refundedQuantity: 'Refunded quantity',
           },
     [locale]
   )
@@ -123,6 +139,10 @@ export default function OrderDetailPage() {
 
   const displayOrderId = order?._id ?? order?.id ?? orderId
   const shippingLabel = formatAddress(order?.shippingAddress)
+  const refundedAmount = order ? getOrderRefundedAmount(order) : 0
+  const effectiveTotal = order ? getOrderEffectiveTotal(order) : 0
+  const refundStatus = order ? getOrderRefundStatus(order) : 'none'
+  const itemsWithRefunds = order ? getRefundableOrderItems(order) : []
 
   return (
     <div className="min-h-screen bg-[#f7f1e8] text-[#18261d]">
@@ -169,8 +189,10 @@ export default function OrderDetailPage() {
                 </div>
                 <div className="rounded-[24px] bg-[#f7f1e8] px-5 py-4 text-right">
                   <p className="text-xs uppercase tracking-[0.25em] text-[#68806f]">{t.orderDetail.status}</p>
-                  <div className="mt-3">
+                  <div className="mt-3 flex flex-wrap justify-end gap-2">
                     <OrderStatusBadge status={order.status} />
+                    <ShippingStatusBadge status={order.shippingStatus} />
+                    <RefundStatusBadge status={refundStatus} />
                   </div>
                 </div>
               </div>
@@ -189,12 +211,31 @@ export default function OrderDetailPage() {
                   <p className="mt-3 text-3xl font-black">{order.paymentLast4 ? `•••• ${order.paymentLast4}` : '-'}</p>
                 </div>
                 <div className="rounded-[24px] bg-[#faf7f1] p-5">
-                  <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#68806f]">
-                    {t.orderDetail.orderTotal}
-                  </p>
-                  <p className="mt-3 text-3xl font-black">${order.totalPrice.toFixed(2)}</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#68806f]">{copy.netTotal}</p>
+                  <p className="mt-3 text-3xl font-black">${effectiveTotal.toFixed(2)}</p>
                 </div>
               </div>
+
+              {refundedAmount > 0 && (
+                <div className="mt-6 grid gap-4 rounded-[24px] border border-[#f0d9ba] bg-[#fff8ef] p-5 md:grid-cols-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#8a5a14]">
+                      {copy.originalTotal}
+                    </p>
+                    <p className="mt-2 text-2xl font-black">${order.totalPrice.toFixed(2)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#8a5a14]">
+                      {copy.refundedTotal}
+                    </p>
+                    <p className="mt-2 text-2xl font-black text-[#8a5a14]">-${refundedAmount.toFixed(2)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#8a5a14]">{copy.netTotal}</p>
+                    <p className="mt-2 text-2xl font-black">${effectiveTotal.toFixed(2)}</p>
+                  </div>
+                </div>
+              )}
 
               <div className="mt-6 grid gap-4 md:grid-cols-3">
                 <div className="rounded-[24px] bg-[#faf7f1] p-5">
@@ -213,8 +254,11 @@ export default function OrderDetailPage() {
               </div>
 
               <div className="mt-6 space-y-4">
-                {order.items.map((item, index) => (
-                  <article key={`${displayOrderId}-${index}`} className="flex gap-4 rounded-[24px] bg-[#faf7f1] p-4">
+                {itemsWithRefunds.map(({ item, itemIndex, refundedQuantity }) => (
+                  <article
+                    key={`${displayOrderId}-${itemIndex}`}
+                    className="flex gap-4 rounded-[24px] bg-[#faf7f1] p-4"
+                  >
                     <Image
                       src={item.image}
                       alt={translateProductName(item.name, locale)}
@@ -230,16 +274,50 @@ export default function OrderDetailPage() {
                       <p className="mt-2 text-sm text-[#5d6a61]">
                         ${item.price} {t.orderDetail.each}
                       </p>
+                      {refundedQuantity > 0 && (
+                        <p className="mt-2 text-sm font-semibold text-[#8a5a14]">
+                          {copy.refundedQuantity} {refundedQuantity}
+                        </p>
+                      )}
                     </div>
                     <p className="self-center text-lg font-bold">${(item.price * item.quantity).toFixed(2)}</p>
                   </article>
                 ))}
               </div>
 
+              <div className="mt-6 rounded-[24px] border border-black/5 bg-[#faf7f1] p-5">
+                <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#68806f]">{copy.refundHistory}</p>
+                {(order.refunds ?? []).length === 0 ? (
+                  <p className="mt-3 text-sm text-[#5d6a61]">{copy.noRefundHistory}</p>
+                ) : (
+                  <div className="mt-3 space-y-3">
+                    {(order.refunds ?? []).map((refund) => (
+                      <div key={refund.id} className="rounded-[20px] border border-black/5 bg-white p-4">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <p className="font-semibold text-[#18261d]">-${refund.amount.toFixed(2)}</p>
+                          <p className="text-sm text-[#5d6a61]">
+                            {formatDateTime(
+                              locale,
+                              typeof refund.createdAt === 'string' ? refund.createdAt : refund.createdAt.toISOString()
+                            )}
+                          </p>
+                        </div>
+                        <p className="mt-2 text-sm text-[#425247]">
+                          {refund.items
+                            .map((item) => `${translateProductName(item.name, locale)} x${item.quantity}`)
+                            .join(', ')}
+                        </p>
+                        {refund.reason && <p className="mt-2 text-sm text-[#5d6a61]">{refund.reason}</p>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               <div className="mt-8 flex justify-end border-t border-black/5 pt-6">
                 <div className="rounded-[24px] bg-[#203126] px-6 py-4 text-right text-white">
-                  <p className="text-xs uppercase tracking-[0.25em] text-[#b8c9bc]">{t.orderDetail.finalTotal}</p>
-                  <p className="mt-2 text-2xl font-black">${order.totalPrice.toFixed(2)}</p>
+                  <p className="text-xs uppercase tracking-[0.25em] text-[#b8c9bc]">{copy.netTotal}</p>
+                  <p className="mt-2 text-2xl font-black">${effectiveTotal.toFixed(2)}</p>
                 </div>
               </div>
             </section>

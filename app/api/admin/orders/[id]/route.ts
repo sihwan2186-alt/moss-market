@@ -3,8 +3,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import dbConnect from '@/db/dbConnect'
 import Order from '@/db/models/order'
 import Product from '@/db/models/product'
-import { findLocalOrderById, updateLocalOrderStatus, updateLocalProductStock } from '@/lib/dev-store'
+import { findLocalOrderById, saveLocalOrder, updateLocalProductStock } from '@/lib/dev-store'
 import { withLocalStoreLock } from '@/lib/local-store-lock'
+import { getNormalizedShippingStatus, getOrderOutstandingStockItems } from '@/lib/order-utils'
 import { getErrorMessage, logServerError } from '@/lib/server-error'
 import { getAuthUser } from '@/lib/session'
 
@@ -30,6 +31,10 @@ function isValidStatus(status?: string): status is NonNullable<UpdateOrderBody['
 
 function isActiveStatus(status: string) {
   return ACTIVE_ORDER_STATUSES.has(status)
+}
+
+function shouldAdjustStock(shippingStatus?: string) {
+  return getNormalizedShippingStatus(shippingStatus) !== 'shipped'
 }
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -75,14 +80,25 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           return
         }
 
-        if (!isActiveStatus(currentStatus) && isActiveStatus(nextStatus)) {
-          const productIds = order.items.map((item) => item.productId)
+        const outstandingItems = getOrderOutstandingStockItems(order.toObject())
+
+        if (!isActiveStatus(currentStatus) && isActiveStatus(nextStatus) && shouldAdjustStock(order.shippingStatus)) {
+          const productIds = outstandingItems.map((item) => item.productId).filter(Boolean)
+
+          if (productIds.length !== outstandingItems.length) {
+            throw new Error('A product in this order no longer exists.')
+          }
+
           const products = await Product.find({ _id: { $in: productIds } })
             .session(session)
             .lean()
           const productMap = new Map(products.map((product) => [product._id.toString(), product]))
 
-          for (const item of order.items) {
+          for (const item of outstandingItems) {
+            if (!item.productId) {
+              throw new Error('A product in this order no longer exists.')
+            }
+
             const product = productMap.get(item.productId.toString())
 
             if (!product) {
@@ -94,7 +110,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
             }
           }
 
-          for (const item of order.items) {
+          for (const item of outstandingItems) {
+            if (!item.productId) {
+              throw new Error('A product in this order no longer exists.')
+            }
+
             const result = await Product.updateOne(
               { _id: item.productId, stock: { $gte: item.quantity } },
               { $inc: { stock: -item.quantity } },
@@ -107,8 +127,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           }
         }
 
-        if (isActiveStatus(currentStatus) && !isActiveStatus(nextStatus)) {
-          for (const item of order.items) {
+        if (isActiveStatus(currentStatus) && !isActiveStatus(nextStatus) && shouldAdjustStock(order.shippingStatus)) {
+          for (const item of outstandingItems) {
+            if (!item.productId) {
+              throw new Error('A product in this order no longer exists.')
+            }
+
             await Product.updateOne({ _id: item.productId }, { $inc: { stock: item.quantity } }, { session })
           }
         }
@@ -153,9 +177,17 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       }
 
       const currentStatus = order.status
-      if (!isActiveStatus(currentStatus) && isActiveStatus(nextStatus)) {
-        for (const item of order.items) {
-          const updatedProduct = await updateLocalProductStock(item.productId, 0)
+      const outstandingItems = getOrderOutstandingStockItems(order)
+
+      if (!isActiveStatus(currentStatus) && isActiveStatus(nextStatus) && shouldAdjustStock(order.shippingStatus)) {
+        for (const item of outstandingItems) {
+          const productId = typeof item.productId === 'string' ? item.productId : ''
+
+          if (!productId) {
+            return NextResponse.json({ message: 'A product in this order no longer exists.' }, { status: 400 })
+          }
+
+          const updatedProduct = await updateLocalProductStock(productId, 0)
 
           if (!updatedProduct) {
             return NextResponse.json({ message: 'A product in this order no longer exists.' }, { status: 400 })
@@ -166,18 +198,31 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           }
         }
 
-        for (const item of order.items) {
-          await updateLocalProductStock(item.productId, -item.quantity)
+        for (const item of outstandingItems) {
+          const productId = typeof item.productId === 'string' ? item.productId : ''
+
+          if (!productId) {
+            return NextResponse.json({ message: 'A product in this order no longer exists.' }, { status: 400 })
+          }
+
+          await updateLocalProductStock(productId, -item.quantity)
         }
       }
 
-      if (isActiveStatus(currentStatus) && !isActiveStatus(nextStatus)) {
-        for (const item of order.items) {
-          await updateLocalProductStock(item.productId, item.quantity)
+      if (isActiveStatus(currentStatus) && !isActiveStatus(nextStatus) && shouldAdjustStock(order.shippingStatus)) {
+        for (const item of outstandingItems) {
+          const productId = typeof item.productId === 'string' ? item.productId : ''
+
+          if (!productId) {
+            return NextResponse.json({ message: 'A product in this order no longer exists.' }, { status: 400 })
+          }
+
+          await updateLocalProductStock(productId, item.quantity)
         }
       }
 
-      const updatedOrder = await updateLocalOrderStatus(id, nextStatus)
+      order.status = nextStatus
+      const updatedOrder = await saveLocalOrder(order)
 
       if (!updatedOrder) {
         return NextResponse.json({ message: 'Order not found.' }, { status: 404 })

@@ -40,6 +40,22 @@ export type LocalOrderItem = {
   image: string
 }
 
+export type LocalOrderRefundItem = {
+  itemIndex: number
+  productId?: string
+  name: string
+  quantity: number
+  amount: number
+}
+
+export type LocalOrderRefund = {
+  id: string
+  amount: number
+  reason: string
+  createdAt: string
+  items: LocalOrderRefundItem[]
+}
+
 export type LocalOrder = {
   id: string
   userId: string
@@ -56,8 +72,10 @@ export type LocalOrder = {
     postalCode: string
     country: string
   } | null
+  shippingStatus: 'preparing' | 'shipped'
   note: string
   paymentLast4: string
+  refunds: LocalOrderRefund[]
   createdAt: string
   updatedAt: string
 }
@@ -337,6 +355,25 @@ export async function updateLocalOrderStatus(orderId: string, status: LocalOrder
   await writeJsonFile(ordersFile, orders)
 
   return order
+}
+
+export async function saveLocalOrder(order: LocalOrder) {
+  const orders = await readJsonFile<LocalOrder[]>(ordersFile, [])
+  const index = orders.findIndex((entry) => entry.id === order.id)
+
+  if (index < 0) {
+    return null
+  }
+
+  const nextOrder = {
+    ...order,
+    updatedAt: nowIso(),
+  }
+
+  orders[index] = nextOrder
+  await writeJsonFile(ordersFile, orders)
+
+  return nextOrder
 }
 
 export async function getLocalRestockSubscriptions() {

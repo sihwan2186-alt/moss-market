@@ -8,6 +8,22 @@ export interface IOrderItem {
   image: string
 }
 
+export interface IOrderRefundItem {
+  itemIndex: number
+  productId?: string
+  name: string
+  quantity: number
+  amount: number
+}
+
+export interface IOrderRefund {
+  id: string
+  amount: number
+  reason: string
+  createdAt: Date
+  items: IOrderRefundItem[]
+}
+
 export interface IOrder {
   userId: Types.ObjectId
   items: IOrderItem[]
@@ -23,8 +39,10 @@ export interface IOrder {
     postalCode: string
     country: string
   } | null
+  shippingStatus: 'preparing' | 'shipped'
   note: string
   paymentLast4: string
+  refunds: IOrderRefund[]
   createdAt: Date
   updatedAt: Date
 }
@@ -52,6 +70,28 @@ const OrderItemSchema = new Schema<IOrderItem>(
   { _id: false }
 )
 
+const OrderRefundItemSchema = new Schema<IOrderRefundItem>(
+  {
+    itemIndex: { type: Number, required: true, min: 0 },
+    productId: { type: String, default: '', trim: true },
+    name: { type: String, required: true },
+    quantity: { type: Number, required: true, min: 1 },
+    amount: { type: Number, required: true, min: 0 },
+  },
+  { _id: false }
+)
+
+const OrderRefundSchema = new Schema<IOrderRefund>(
+  {
+    id: { type: String, required: true, trim: true },
+    amount: { type: Number, required: true, min: 0 },
+    reason: { type: String, default: '', trim: true },
+    createdAt: { type: Date, required: true },
+    items: { type: [OrderRefundItemSchema], default: [] },
+  },
+  { _id: false }
+)
+
 const OrderSchema = new Schema<IOrder>(
   {
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
@@ -60,8 +100,14 @@ const OrderSchema = new Schema<IOrder>(
     customerName: { type: String, default: '', trim: true },
     contactEmail: { type: String, default: '', trim: true, lowercase: true },
     shippingAddress: { type: ShippingAddressSchema, default: null },
+    shippingStatus: {
+      type: String,
+      enum: ['preparing', 'shipped'],
+      default: 'preparing',
+    },
     note: { type: String, default: '', trim: true },
     paymentLast4: { type: String, default: '', trim: true },
+    refunds: { type: [OrderRefundSchema], default: [] },
     status: {
       type: String,
       enum: ['pending', 'paid', 'cancelled'],

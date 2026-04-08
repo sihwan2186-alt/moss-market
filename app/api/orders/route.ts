@@ -233,6 +233,8 @@ export async function POST(request: NextRequest) {
               items,
               totalPrice,
               status: 'paid',
+              shippingStatus: 'preparing',
+              refunds: [],
               ...normalizedCheckout.data,
             },
           ],
@@ -315,6 +317,8 @@ export async function POST(request: NextRequest) {
           items,
           totalPrice,
           status: 'paid',
+          shippingStatus: 'preparing',
+          refunds: [],
           ...normalizedCheckout.data,
         })
 
