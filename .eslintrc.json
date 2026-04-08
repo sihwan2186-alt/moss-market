@@ -24,6 +24,6 @@
     "prettier/prettier": ["error", { "endOfLine": "auto" }], // Prettier의 규칙을 따르지 않는 코드를 오류로 처리하며, 플랫폼별로 다른 개행 문자 문제를 방지하기 위해 'auto'로 설정.
     "react/react-in-jsx-scope": "off", // React 17 이상에서는 JSX에서 React를 import할 필요가 없으므로 이 규칙을 비활성화.
     "@typescript-eslint/explicit-module-boundary-types": "off", // 모듈 경계에서 타입을 명시적으로 지정하지 않도록 허용.
-    "@typescript-eslint/no-unused-vars": ["error", { "vars": "all", "args": "after-used", "ignoreRestSiblings": false }] // 사용되지 않는 변수에 대해 오류를 표시하여 코드 정리를 유도.
+    "@typescript-eslint/no-unused-vars": ["error", { "vars": "all", "args": "after-used", "argsIgnorePattern": "^_", "ignoreRestSiblings": false }] // 사용되지 않는 변수에 대해 오류를 표시하여 코드 정리를 유도. `_`로 시작하는 인자는 의도적인 미사용 값으로 허용.
   }
 }
