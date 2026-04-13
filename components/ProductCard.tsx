@@ -6,7 +6,7 @@ import { useState } from 'react'
 import { useLanguage } from '@/components/LanguageProvider'
 import { dispatchCartUpdated } from '@/lib/cart-events'
 import { translateCategory } from '@/lib/i18n'
-import { shouldBypassProductImageOptimization } from '@/lib/product-image-storage'
+import { shouldBypassProductImageOptimization } from '@/lib/product-image-utils'
 import { translateProductDescription, translateProductName } from '@/lib/sample-products'
 
 type ProductCardProps = {

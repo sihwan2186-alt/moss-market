@@ -1,3 +1,5 @@
+import 'server-only'
+
 import { del, put } from '@vercel/blob'
 import { promises as fs } from 'fs'
 import path from 'path'
@@ -15,10 +17,6 @@ function isProductionRuntime() {
 
 export function isBlobStorageConfigured() {
   return Boolean(process.env.BLOB_READ_WRITE_TOKEN)
-}
-
-export function shouldBypassProductImageOptimization(imageUrl: string) {
-  return imageUrl.startsWith(LOCAL_PRODUCT_IMAGE_PREFIX)
 }
 
 function isBlobProductImageUrl(imageUrl: string) {

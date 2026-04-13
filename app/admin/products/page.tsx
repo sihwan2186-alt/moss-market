@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLanguage } from '@/components/LanguageProvider'
 import StoreHeader from '@/components/StoreHeader'
 import { translateCategory } from '@/lib/i18n'
-import { shouldBypassProductImageOptimization } from '@/lib/product-image-storage'
+import { shouldBypassProductImageOptimization } from '@/lib/product-image-utils'
 import { translateProductDescription, translateProductName } from '@/lib/sample-products'
 
 type Product = {

@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLanguage } from '@/components/LanguageProvider'
 import StoreHeader from '@/components/StoreHeader'
 import { dispatchCartUpdated } from '@/lib/cart-events'
-import { shouldBypassProductImageOptimization } from '@/lib/product-image-storage'
+import { shouldBypassProductImageOptimization } from '@/lib/product-image-utils'
 import { translateProductName } from '@/lib/sample-products'
 
 type CartItem = {

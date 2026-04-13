@@ -7,7 +7,7 @@ import ProductDetailActions from '@/components/ProductDetailActions'
 import StoreHeader from '@/components/StoreHeader'
 import { useLanguage } from '@/components/LanguageProvider'
 import { Locale, translateCategory } from '@/lib/i18n'
-import { shouldBypassProductImageOptimization } from '@/lib/product-image-storage'
+import { shouldBypassProductImageOptimization } from '@/lib/product-image-utils'
 import { translateProductDescription, translateProductName } from '@/lib/sample-products'
 
 type ProductDetail = {

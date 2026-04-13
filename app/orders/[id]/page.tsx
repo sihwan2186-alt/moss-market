@@ -18,7 +18,7 @@ import {
   type RefundRecord,
   type ShippingAddressFields,
 } from '@/lib/order-utils'
-import { shouldBypassProductImageOptimization } from '@/lib/product-image-storage'
+import { shouldBypassProductImageOptimization } from '@/lib/product-image-utils'
 import { translateProductName } from '@/lib/sample-products'
 
 type OrderItem = {
