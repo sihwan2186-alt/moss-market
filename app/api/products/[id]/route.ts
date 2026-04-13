@@ -9,6 +9,7 @@ import {
   markLocalRestockSubscriptionsNotified,
   updateLocalProduct,
 } from '@/lib/dev-store'
+import { removeStoredProductImages } from '@/lib/product-image-storage'
 import { getErrorMessage, logServerError } from '@/lib/server-error'
 import { getAuthUser } from '@/lib/session'
 
@@ -147,8 +148,17 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     }
 
     const previousStock = existingProduct.stock
+    const previousImages = [...existingProduct.images]
     existingProduct.set(normalized.data)
     await existingProduct.save()
+
+    const removedImages = previousImages.filter((image) => !normalized.data.images.includes(image))
+
+    try {
+      await removeStoredProductImages(removedImages)
+    } catch (error) {
+      logServerError('products:update-image-cleanup', error)
+    }
 
     const restockNotifications =
       previousStock <= 0 && normalized.data.stock > 0 ? await notifyRestockSubscribers(id) : []
@@ -217,6 +227,12 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
 
     if (!product) {
       return NextResponse.json({ message: 'Product not found.' }, { status: 404 })
+    }
+
+    try {
+      await removeStoredProductImages(product.images)
+    } catch (error) {
+      logServerError('products:delete-image-cleanup', error)
     }
 
     return NextResponse.json({ message: 'Product deleted.' }, { status: 200 })

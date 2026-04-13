@@ -1,7 +1,7 @@
-import { promises as fs } from 'fs'
 import path from 'path'
 import { randomUUID } from 'crypto'
 import { NextResponse } from 'next/server'
+import { storeProductImage } from '@/lib/product-image-storage'
 import { getAuthUser } from '@/lib/session'
 
 const ALLOWED_IMAGE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif', '.avif'])
@@ -42,9 +42,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: 'Please select at least one image file.' }, { status: 400 })
   }
 
-  const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'products')
-  await fs.mkdir(uploadDir, { recursive: true })
-
   const imagePaths: string[] = []
 
   for (const file of files) {
@@ -59,11 +56,17 @@ export async function POST(request: Request) {
     }
 
     const filename = `${Date.now()}-${randomUUID()}${safeExtension}`
-    const filePath = path.join(uploadDir, filename)
-    const bytes = new Uint8Array(await file.arrayBuffer())
 
-    await fs.writeFile(filePath, bytes)
-    imagePaths.push(`/uploads/products/${filename}`)
+    try {
+      imagePaths.push(await storeProductImage(file, filename))
+    } catch (error) {
+      return NextResponse.json(
+        {
+          message: error instanceof Error ? error.message : 'Failed to store product images.',
+        },
+        { status: 500 }
+      )
+    }
   }
 
   return NextResponse.json({ images: imagePaths }, { status: 201 })
