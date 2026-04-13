@@ -7,6 +7,7 @@ import ProductDetailActions from '@/components/ProductDetailActions'
 import StoreHeader from '@/components/StoreHeader'
 import { useLanguage } from '@/components/LanguageProvider'
 import { Locale, translateCategory } from '@/lib/i18n'
+import { shouldBypassProductImageOptimization } from '@/lib/product-image-storage'
 import { translateProductDescription, translateProductName } from '@/lib/sample-products'
 
 type ProductDetail = {
@@ -81,6 +82,7 @@ export default function ProductDetailView({ product, source }: ProductDetailView
                   alt={localizedName}
                   width={1200}
                   height={900}
+                  unoptimized={shouldBypassProductImageOptimization(activeImage)}
                   className="h-full w-full object-cover"
                 />
               ) : (
@@ -105,6 +107,7 @@ export default function ProductDetailView({ product, source }: ProductDetailView
                       alt={localizedName}
                       width={240}
                       height={180}
+                      unoptimized={shouldBypassProductImageOptimization(image)}
                       className="h-20 w-full object-cover"
                     />
                   </button>

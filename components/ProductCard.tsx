@@ -6,6 +6,7 @@ import { useState } from 'react'
 import { useLanguage } from '@/components/LanguageProvider'
 import { dispatchCartUpdated } from '@/lib/cart-events'
 import { translateCategory } from '@/lib/i18n'
+import { shouldBypassProductImageOptimization } from '@/lib/product-image-storage'
 import { translateProductDescription, translateProductName } from '@/lib/sample-products'
 
 type ProductCardProps = {
@@ -68,6 +69,7 @@ export default function ProductCard({ id, name, description, price, image, categ
             alt={localizedName}
             width={900}
             height={675}
+            unoptimized={shouldBypassProductImageOptimization(image)}
             className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
           />
         </div>

@@ -17,6 +17,10 @@ export function isBlobStorageConfigured() {
   return Boolean(process.env.BLOB_READ_WRITE_TOKEN)
 }
 
+export function shouldBypassProductImageOptimization(imageUrl: string) {
+  return imageUrl.startsWith(LOCAL_PRODUCT_IMAGE_PREFIX)
+}
+
 function isBlobProductImageUrl(imageUrl: string) {
   try {
     return new URL(imageUrl).hostname.endsWith(BLOB_HOST_SUFFIX)

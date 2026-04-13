@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useLanguage } from '@/components/LanguageProvider'
 import StoreHeader from '@/components/StoreHeader'
 import { dispatchCartUpdated } from '@/lib/cart-events'
+import { shouldBypassProductImageOptimization } from '@/lib/product-image-storage'
 import { translateProductName } from '@/lib/sample-products'
 
 type CartItem = {
@@ -263,6 +264,7 @@ export default function CheckoutPage() {
                       alt={translateProductName(item.name, locale)}
                       width={80}
                       height={80}
+                      unoptimized={shouldBypassProductImageOptimization(item.image)}
                       className="h-20 w-20 rounded-2xl object-cover"
                     />
                     <div className="flex-1">

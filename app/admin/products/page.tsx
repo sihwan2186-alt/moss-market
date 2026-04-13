@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLanguage } from '@/components/LanguageProvider'
 import StoreHeader from '@/components/StoreHeader'
 import { translateCategory } from '@/lib/i18n'
+import { shouldBypassProductImageOptimization } from '@/lib/product-image-storage'
 import { translateProductDescription, translateProductName } from '@/lib/sample-products'
 
 type Product = {
@@ -486,6 +487,7 @@ export default function AdminProductsPage() {
                                   alt={`Stored product preview ${index + 1}`}
                                   width={240}
                                   height={180}
+                                  unoptimized={shouldBypassProductImageOptimization(image)}
                                   className="h-28 w-full rounded-2xl object-cover"
                                 />
                               )
@@ -550,6 +552,7 @@ export default function AdminProductsPage() {
                           alt={translateProductName(product.name, locale)}
                           width={800}
                           height={440}
+                          unoptimized={shouldBypassProductImageOptimization(product.images[0])}
                           className="h-44 w-full bg-[#e8dfd2] object-cover"
                         />
                       ) : (
@@ -589,6 +592,7 @@ export default function AdminProductsPage() {
                                   alt={`${translateProductName(product.name, locale)} ${index + 2}`}
                                   width={160}
                                   height={120}
+                                  unoptimized={shouldBypassProductImageOptimization(image)}
                                   className="h-16 w-full rounded-2xl object-cover"
                                 />
                               ))}

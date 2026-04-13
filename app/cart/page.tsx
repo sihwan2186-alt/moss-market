@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLanguage } from '@/components/LanguageProvider'
 import StoreHeader from '@/components/StoreHeader'
 import { dispatchCartUpdated } from '@/lib/cart-events'
+import { shouldBypassProductImageOptimization } from '@/lib/product-image-storage'
 import { translateProductName } from '@/lib/sample-products'
 
 type CartItem = {
@@ -179,6 +180,7 @@ export default function CartPage() {
                   alt={translateProductName(item.name, locale)}
                   width={96}
                   height={96}
+                  unoptimized={shouldBypassProductImageOptimization(item.image)}
                   className="h-24 w-24 rounded-2xl object-cover"
                 />
                 <div className="flex-1">

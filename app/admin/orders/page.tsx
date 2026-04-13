@@ -19,6 +19,7 @@ import {
   type RefundRecord,
   type ShippingAddressFields,
 } from '@/lib/order-utils'
+import { shouldBypassProductImageOptimization } from '@/lib/product-image-storage'
 import { translateProductName } from '@/lib/sample-products'
 
 type AdminOrderItem = {
@@ -840,6 +841,7 @@ export default function AdminOrdersPage() {
                               alt={translateProductName(item.name, locale)}
                               width={64}
                               height={64}
+                              unoptimized={shouldBypassProductImageOptimization(item.image)}
                               className="h-16 w-16 rounded-2xl object-cover"
                             />
                             <div className="flex-1">
