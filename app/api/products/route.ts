@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import dbConnect from '@/db/dbConnect'
 import Product from '@/db/models/product'
+import { isDatabaseUnavailableError } from '@/lib/database-error'
 import { createLocalProduct, getLocalProducts } from '@/lib/dev-store'
-import { getErrorMessage, logServerError } from '@/lib/server-error'
+import { logServerError } from '@/lib/server-error'
 import { ensureProductsSeeded } from '@/lib/store'
 import { getAuthUser } from '@/lib/session'
 
@@ -24,15 +25,6 @@ type NormalizedProductInput = {
   stock: number
   category: string
   featured: boolean
-}
-
-function isConnectionError(message: string) {
-  return (
-    message.includes('querySrv') ||
-    message.includes('ECONNREFUSED') ||
-    message.includes('ENOTFOUND') ||
-    message.includes('buffering timed out')
-  )
 }
 
 function normalizeProductBody(body: ProductBody): { data?: NormalizedProductInput; message?: string } {
@@ -89,9 +81,7 @@ export async function GET() {
 
     return NextResponse.json({ products }, { status: 200 })
   } catch (error) {
-    const message = getErrorMessage(error)
-
-    if (!isConnectionError(message)) {
+    if (!isDatabaseUnavailableError(error)) {
       logServerError('products:get', error)
       return NextResponse.json({ message: 'Failed to load products.' }, { status: 500 })
     }
@@ -126,9 +116,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ message: 'Product created.', product }, { status: 201 })
   } catch (error) {
-    const message = getErrorMessage(error)
-
-    if (!isConnectionError(message)) {
+    if (!isDatabaseUnavailableError(error)) {
       logServerError('products:create', error)
       return NextResponse.json({ message: 'Failed to create product.' }, { status: 500 })
     }

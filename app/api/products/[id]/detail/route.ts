@@ -2,19 +2,11 @@ import mongoose from 'mongoose'
 import { NextResponse } from 'next/server'
 import dbConnect from '@/db/dbConnect'
 import Product from '@/db/models/product'
+import { isDatabaseUnavailableError } from '@/lib/database-error'
 import { findLocalProductById } from '@/lib/dev-store'
 import { getErrorMessage, logServerError } from '@/lib/server-error'
 
 const FALLBACK_PRODUCT_LOOKUP = 'FALLBACK_PRODUCT_LOOKUP'
-
-function isConnectionError(message: string) {
-  return (
-    message.includes('querySrv') ||
-    message.includes('ECONNREFUSED') ||
-    message.includes('ENOTFOUND') ||
-    message.includes('buffering timed out')
-  )
-}
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -35,7 +27,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   } catch (error) {
     const message = getErrorMessage(error)
 
-    if (message !== FALLBACK_PRODUCT_LOOKUP && !isConnectionError(message)) {
+    if (message !== FALLBACK_PRODUCT_LOOKUP && !isDatabaseUnavailableError(error)) {
       logServerError('products:getDetail', error)
       return NextResponse.json({ message: 'Failed to load product.' }, { status: 500 })
     }

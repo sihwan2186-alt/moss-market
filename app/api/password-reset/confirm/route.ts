@@ -3,25 +3,17 @@ import dbConnect from '@/db/dbConnect'
 import PasswordResetToken from '@/db/models/password-reset-token'
 import User from '@/db/models/user'
 import { hashPassword, hashToken } from '@/lib/auth'
+import { isDatabaseUnavailableError } from '@/lib/database-error'
 import {
   findLocalPasswordResetTokenByHash,
   markLocalPasswordResetTokenUsed,
   updateLocalUserPassword,
 } from '@/lib/dev-user-store'
-import { getErrorMessage, logServerError } from '@/lib/server-error'
+import { logServerError } from '@/lib/server-error'
 
 type PasswordResetConfirmBody = {
   token?: string
   password?: string
-}
-
-function isConnectionError(message: string) {
-  return (
-    message.includes('querySrv') ||
-    message.includes('ECONNREFUSED') ||
-    message.includes('ENOTFOUND') ||
-    message.includes('buffering timed out')
-  )
 }
 
 function getTokenHash(token?: string | null) {
@@ -54,9 +46,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ valid: true }, { status: 200 })
   } catch (error) {
-    const message = getErrorMessage(error)
-
-    if (!isConnectionError(message)) {
+    if (!isDatabaseUnavailableError(error)) {
       logServerError('password-reset:validate', error)
       return NextResponse.json({ message: 'Could not validate the reset token.' }, { status: 500 })
     }
@@ -108,9 +98,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ message: 'Password reset complete. You can now log in.' }, { status: 200 })
   } catch (error) {
-    const message = getErrorMessage(error)
-
-    if (!isConnectionError(message)) {
+    if (!isDatabaseUnavailableError(error)) {
       logServerError('password-reset:confirm', error)
       return NextResponse.json({ message: 'Could not reset the password.' }, { status: 500 })
     }

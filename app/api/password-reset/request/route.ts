@@ -3,8 +3,9 @@ import dbConnect from '@/db/dbConnect'
 import PasswordResetToken from '@/db/models/password-reset-token'
 import User from '@/db/models/user'
 import { createSecureToken, hashToken } from '@/lib/auth'
+import { isDatabaseUnavailableError } from '@/lib/database-error'
 import { createLocalPasswordResetToken, findLocalUserByEmail } from '@/lib/dev-user-store'
-import { getErrorMessage, logServerError } from '@/lib/server-error'
+import { logServerError } from '@/lib/server-error'
 
 type PasswordResetRequestBody = {
   email?: string
@@ -12,15 +13,6 @@ type PasswordResetRequestBody = {
 
 const PASSWORD_RESET_TTL_MS = 1000 * 60 * 60
 const GENERIC_RESET_MESSAGE = 'If an account exists for that email, password reset instructions have been prepared.'
-
-function isConnectionError(message: string) {
-  return (
-    message.includes('querySrv') ||
-    message.includes('ECONNREFUSED') ||
-    message.includes('ENOTFOUND') ||
-    message.includes('buffering timed out')
-  )
-}
 
 function isValidEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
@@ -70,9 +62,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ message: GENERIC_RESET_MESSAGE }, { status: 200 })
   } catch (error) {
-    const message = getErrorMessage(error)
-
-    if (!isConnectionError(message)) {
+    if (!isDatabaseUnavailableError(error)) {
       logServerError('password-reset:request', error)
       return NextResponse.json({ message: 'Could not create a password reset link.' }, { status: 500 })
     }

@@ -24,7 +24,10 @@ const RestockSubscriptionSchema = new Schema<IRestockSubscription>(
   }
 )
 
-RestockSubscriptionSchema.index({ productId: 1, email: 1, status: 1 }, { unique: true, partialFilterExpression: { status: 'pending' } })
+RestockSubscriptionSchema.index(
+  { productId: 1, email: 1, status: 1 },
+  { unique: true, partialFilterExpression: { status: 'pending' } }
+)
 
 const RestockSubscription =
   (mongoose.models.RestockSubscription as Model<IRestockSubscription>) ||

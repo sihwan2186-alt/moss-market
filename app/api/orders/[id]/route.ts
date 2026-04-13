@@ -2,18 +2,10 @@ import mongoose from 'mongoose'
 import { NextResponse } from 'next/server'
 import Order from '@/db/models/order'
 import dbConnect from '@/db/dbConnect'
+import { isDatabaseUnavailableError } from '@/lib/database-error'
 import { getLocalOrderById } from '@/lib/dev-store'
 import { getErrorMessage, logServerError } from '@/lib/server-error'
 import { getAuthUser } from '@/lib/session'
-
-function isConnectionError(message: string) {
-  return (
-    message.includes('querySrv') ||
-    message.includes('ECONNREFUSED') ||
-    message.includes('ENOTFOUND') ||
-    message.includes('buffering timed out')
-  )
-}
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const authUser = await getAuthUser()
@@ -40,7 +32,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   } catch (error) {
     const message = getErrorMessage(error)
 
-    if (message !== 'FALLBACK_ORDER_LOOKUP' && !isConnectionError(message)) {
+    if (message !== 'FALLBACK_ORDER_LOOKUP' && !isDatabaseUnavailableError(error)) {
       logServerError('orders:getById', error)
       return NextResponse.json({ message: 'Failed to load order.' }, { status: 500 })
     }

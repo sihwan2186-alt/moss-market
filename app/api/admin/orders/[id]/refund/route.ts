@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import dbConnect from '@/db/dbConnect'
 import Order from '@/db/models/order'
 import Product from '@/db/models/product'
+import { isDatabaseUnavailableError } from '@/lib/database-error'
 import { findLocalOrderById, saveLocalOrder, updateLocalProductStock } from '@/lib/dev-store'
 import { parseOptionalJsonBody } from '@/lib/json-body'
 import { withLocalStoreLock } from '@/lib/local-store-lock'
@@ -16,15 +17,6 @@ type RefundOrderBody = {
 }
 
 const FALLBACK_ORDER_LOOKUP = 'FALLBACK_ORDER_LOOKUP'
-
-function isConnectionError(message: string) {
-  return (
-    message.includes('querySrv') ||
-    message.includes('ECONNREFUSED') ||
-    message.includes('ENOTFOUND') ||
-    message.includes('buffering timed out')
-  )
-}
 
 function shouldRestock(shippingStatus?: string) {
   return getNormalizedShippingStatus(shippingStatus) !== 'shipped'
@@ -119,7 +111,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ message }, { status })
     }
 
-    if (message !== FALLBACK_ORDER_LOOKUP && !isConnectionError(message)) {
+    if (message !== FALLBACK_ORDER_LOOKUP && !isDatabaseUnavailableError(error)) {
       logServerError('admin-orders:refund', error)
       return NextResponse.json({ message: 'Failed to save refund.' }, { status: 500 })
     }

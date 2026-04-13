@@ -1,23 +1,7 @@
 import type { NextAuthOptions } from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
-import dbConnect from '@/db/dbConnect'
-import User from '@/db/models/user'
-import {
-  ensureConfiguredAdminUserInDatabase,
-  ensureConfiguredAdminUserInLocalStore,
-  isConfiguredAdminEmail,
-} from '@/lib/admin-account'
-import { verifyPassword } from '@/lib/auth'
-import { findLocalUserByEmail } from '@/lib/dev-user-store'
-
-function isConnectionError(message: string) {
-  return (
-    message.includes('querySrv') ||
-    message.includes('ECONNREFUSED') ||
-    message.includes('ENOTFOUND') ||
-    message.includes('buffering timed out')
-  )
-}
+import { authenticateCredentials } from '@/lib/credentials-auth'
+import { logServerError } from '@/lib/server-error'
 
 export const authOptions: NextAuthOptions = {
   secret: process.env.AUTH_SECRET ?? process.env.JWT_SECRET,
@@ -51,46 +35,9 @@ export const authOptions: NextAuthOptions = {
         }
 
         try {
-          await dbConnect()
+          const user = await authenticateCredentials({ email, password, loginMode })
 
-          if (loginMode === 'admin' && isConfiguredAdminEmail(email)) {
-            await ensureConfiguredAdminUserInDatabase()
-          }
-
-          const user = await User.findOne({ email })
-
-          if (!user || !verifyPassword(password, user.passwordHash)) {
-            return null
-          }
-
-          if (loginMode === 'admin' && user.role !== 'admin') {
-            return null
-          }
-
-          return {
-            id: user._id.toString(),
-            name: user.name,
-            email: user.email,
-            role: user.role,
-          }
-        } catch (error) {
-          const message = error instanceof Error ? error.message : 'Unknown auth error'
-
-          if (!isConnectionError(message)) {
-            return null
-          }
-
-          if (loginMode === 'admin' && isConfiguredAdminEmail(email)) {
-            await ensureConfiguredAdminUserInLocalStore()
-          }
-
-          const user = await findLocalUserByEmail(email)
-
-          if (!user || !verifyPassword(password, user.passwordHash)) {
-            return null
-          }
-
-          if (loginMode === 'admin' && user.role !== 'admin') {
+          if (!user) {
             return null
           }
 
@@ -100,6 +47,9 @@ export const authOptions: NextAuthOptions = {
             email: user.email,
             role: user.role,
           }
+        } catch (error) {
+          logServerError('auth:authorize', error)
+          return null
         }
       },
     }),

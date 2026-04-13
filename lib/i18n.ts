@@ -49,7 +49,7 @@ export const messages = {
       healthCheck: 'Health check',
       includedNow: 'Included now',
       includedItems: [
-        'MongoDB connection and seed products',
+        'MongoDB connection and starter products',
         'Signup, login, and logout API routes',
         'Cart and order creation endpoints',
         'Shop, cart, and order pages',
@@ -57,7 +57,7 @@ export const messages = {
       nextBuildStep: 'Next build step',
       nextBuildDescription:
         'Replace the demo checkout with your payment provider, then connect deployment secrets in Vercel.',
-      fallback: 'MongoDB is not reachable right now, so sample products are being shown instead.',
+      fallback: 'MongoDB is not reachable right now, so starter products are being shown instead.',
     },
     catalog: {
       eyebrow: 'Featured catalog',
@@ -402,14 +402,14 @@ export const messages = {
       healthCheck: '연결 상태 확인',
       includedNow: '현재 포함 기능',
       includedItems: [
-        'MongoDB 연결과 상품 시드',
+        'MongoDB 연결과 기본 상품 데이터',
         '회원가입, 로그인, 로그아웃 API',
         '장바구니와 주문 생성 API',
         '기본 상점, 장바구니, 주문 화면',
       ],
       nextBuildStep: '다음 단계',
       nextBuildDescription: '테스트 결제 흐름을 실제 결제 서비스로 교체하고, Vercel 배포용 시크릿을 연결해보세요.',
-      fallback: '현재 MongoDB에 연결할 수 없어 샘플 상품을 대신 표시하고 있습니다.',
+      fallback: '현재 MongoDB에 연결할 수 없어 기본 상품을 대신 표시하고 있습니다.',
     },
     catalog: {
       eyebrow: '대표 상품',

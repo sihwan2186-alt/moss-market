@@ -71,14 +71,14 @@ Open:
 
 ## MongoDB fallback mode
 
-If MongoDB is temporarily unavailable, the app can fall back to local JSON files in the `data/` directory for:
+If MongoDB is temporarily unavailable or not configured yet, the app can fall back to local JSON files in the `data/` directory for:
 
 - users
 - products
 - carts
 - orders
 
-This helps development continue while Atlas or network connectivity is unstable.
+Starter products are seeded into the fallback store so the shop can still render on a clean setup while Atlas or network connectivity is unstable.
 
 ## Suggested branch flow
 

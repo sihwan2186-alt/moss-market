@@ -10,6 +10,7 @@ import {
   getLocalProducts,
   saveLocalCart,
 } from '@/lib/dev-store'
+import { isDatabaseUnavailableError } from '@/lib/database-error'
 import { getErrorMessage, logServerError } from '@/lib/server-error'
 import { getAuthUser } from '@/lib/session'
 
@@ -24,15 +25,6 @@ type UpdateCartBody = {
 }
 
 const FALLBACK_PRODUCT_LOOKUP = 'FALLBACK_PRODUCT_LOOKUP'
-
-function isConnectionError(message: string) {
-  return (
-    message.includes('querySrv') ||
-    message.includes('ECONNREFUSED') ||
-    message.includes('ENOTFOUND') ||
-    message.includes('buffering timed out')
-  )
-}
 
 function normalizeQuantity(quantity?: number, fallback = 1) {
   const numericQuantity = Number(quantity)
@@ -83,9 +75,7 @@ export async function GET() {
 
     return NextResponse.json({ items, totalPrice }, { status: 200 })
   } catch (error) {
-    const message = getErrorMessage(error)
-
-    if (!isConnectionError(message)) {
+    if (!isDatabaseUnavailableError(error)) {
       logServerError('cart:get', error)
       return NextResponse.json({ message: 'Failed to load cart.' }, { status: 500 })
     }
@@ -170,7 +160,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     const message = getErrorMessage(error)
 
-    if (message !== FALLBACK_PRODUCT_LOOKUP && !isConnectionError(message)) {
+    if (message !== FALLBACK_PRODUCT_LOOKUP && !isDatabaseUnavailableError(error)) {
       logServerError('cart:add', error)
       return NextResponse.json({ message: 'Failed to update cart.' }, { status: 500 })
     }
@@ -264,7 +254,7 @@ export async function PATCH(request: NextRequest) {
   } catch (error) {
     const message = getErrorMessage(error)
 
-    if (message !== FALLBACK_PRODUCT_LOOKUP && !isConnectionError(message)) {
+    if (message !== FALLBACK_PRODUCT_LOOKUP && !isDatabaseUnavailableError(error)) {
       logServerError('cart:updateQuantity', error)
       return NextResponse.json({ message: 'Failed to update cart quantity.' }, { status: 500 })
     }
@@ -331,7 +321,7 @@ export async function DELETE(request: NextRequest) {
   } catch (error) {
     const message = getErrorMessage(error)
 
-    if (message !== FALLBACK_PRODUCT_LOOKUP && !isConnectionError(message)) {
+    if (message !== FALLBACK_PRODUCT_LOOKUP && !isDatabaseUnavailableError(error)) {
       logServerError('cart:deleteItem', error)
       return NextResponse.json({ message: 'Failed to remove cart item.' }, { status: 500 })
     }

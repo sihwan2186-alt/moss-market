@@ -12,6 +12,7 @@ import {
   saveLocalCart,
   updateLocalProductStock,
 } from '@/lib/dev-store'
+import { isDatabaseUnavailableError } from '@/lib/database-error'
 import { parseOptionalJsonBody } from '@/lib/json-body'
 import { withLocalStoreLock } from '@/lib/local-store-lock'
 import { getErrorMessage, logServerError } from '@/lib/server-error'
@@ -46,15 +47,6 @@ type NormalizedCheckoutDetails = {
   } | null
   note: string
   paymentLast4: string
-}
-
-function isConnectionError(message: string) {
-  return (
-    message.includes('querySrv') ||
-    message.includes('ECONNREFUSED') ||
-    message.includes('ENOTFOUND') ||
-    message.includes('buffering timed out')
-  )
 }
 
 function isValidEmail(email: string) {
@@ -143,9 +135,7 @@ export async function GET() {
 
     return NextResponse.json({ orders }, { status: 200 })
   } catch (error) {
-    const message = getErrorMessage(error)
-
-    if (!isConnectionError(message)) {
+    if (!isDatabaseUnavailableError(error)) {
       logServerError('orders:get', error)
       return NextResponse.json({ message: 'Failed to load orders.' }, { status: 500 })
     }
@@ -257,7 +247,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message }, { status: 400 })
     }
 
-    if (!isConnectionError(message)) {
+    if (!isDatabaseUnavailableError(error)) {
       logServerError('orders:create', error)
       return NextResponse.json({ message: 'Failed to create order.' }, { status: 500 })
     }

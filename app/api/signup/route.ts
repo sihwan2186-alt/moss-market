@@ -3,22 +3,14 @@ import { isConfiguredAdminEmail } from '@/lib/admin-account'
 import dbConnect from '@/db/dbConnect'
 import User from '@/db/models/user'
 import { hashPassword } from '@/lib/auth'
+import { isDatabaseUnavailableError } from '@/lib/database-error'
 import { createLocalUser, findLocalUserByEmail } from '@/lib/dev-user-store'
-import { getErrorMessage, logServerError } from '@/lib/server-error'
+import { logServerError } from '@/lib/server-error'
 
 type SignUpBody = {
   name?: string
   email?: string
   password?: string
-}
-
-function isConnectionError(message: string) {
-  return (
-    message.includes('querySrv') ||
-    message.includes('ECONNREFUSED') ||
-    message.includes('ENOTFOUND') ||
-    message.includes('buffering timed out')
-  )
 }
 
 export async function POST(request: NextRequest) {
@@ -68,9 +60,7 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     )
   } catch (error) {
-    const message = getErrorMessage(error)
-
-    if (isConnectionError(message)) {
+    if (isDatabaseUnavailableError(error)) {
       const existingLocalUser = await findLocalUserByEmail(email)
 
       if (existingLocalUser) {

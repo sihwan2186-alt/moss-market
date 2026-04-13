@@ -12,6 +12,7 @@ import {
   type ShippingAddressFields,
   type ShippingStatus,
 } from '@/lib/order-utils'
+import { isDatabaseUnavailableError } from '@/lib/database-error'
 import { getErrorMessage, logServerError } from '@/lib/server-error'
 import { getAuthUser } from '@/lib/session'
 
@@ -21,15 +22,6 @@ type UpdateShippingBody = {
 }
 
 const FALLBACK_ORDER_LOOKUP = 'FALLBACK_ORDER_LOOKUP'
-
-function isConnectionError(message: string) {
-  return (
-    message.includes('querySrv') ||
-    message.includes('ECONNREFUSED') ||
-    message.includes('ENOTFOUND') ||
-    message.includes('buffering timed out')
-  )
-}
 
 function getSuccessMessage(hasShippingStatus: boolean, hasShippingAddress: boolean) {
   if (hasShippingStatus && hasShippingAddress) {
@@ -116,7 +108,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       return NextResponse.json({ message }, { status: 404 })
     }
 
-    if (message !== FALLBACK_ORDER_LOOKUP && !isConnectionError(message)) {
+    if (message !== FALLBACK_ORDER_LOOKUP && !isDatabaseUnavailableError(error)) {
       logServerError('admin-orders:updateShipping', error)
       return NextResponse.json({ message: 'Failed to update shipping details.' }, { status: 500 })
     }

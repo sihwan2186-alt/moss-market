@@ -1,22 +1,15 @@
 import { NextResponse } from 'next/server'
+import { clearAuthSessionCookies } from '@/lib/next-auth-session'
 
 export async function POST() {
   const response = NextResponse.json(
     {
-      message: 'Use the NextAuth signOut client flow for logout.',
+      message: 'Logged out successfully.',
     },
     { status: 200 }
   )
 
-  response.cookies.set({
-    name: 'auth_token',
-    value: '',
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
-    path: '/',
-    maxAge: 0,
-  })
+  clearAuthSessionCookies(response)
 
   return response
 }

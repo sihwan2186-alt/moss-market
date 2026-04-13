@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import dbConnect from '@/db/dbConnect'
 import Product from '@/db/models/product'
 import RestockSubscription from '@/db/models/restock-subscription'
+import { isDatabaseUnavailableError } from '@/lib/database-error'
 import {
   deleteLocalProduct,
   findLocalProductById,
@@ -34,15 +35,6 @@ type NormalizedProductInput = {
 }
 
 const FALLBACK_PRODUCT_LOOKUP = 'FALLBACK_PRODUCT_LOOKUP'
-
-function isConnectionError(message: string) {
-  return (
-    message.includes('querySrv') ||
-    message.includes('ECONNREFUSED') ||
-    message.includes('ENOTFOUND') ||
-    message.includes('buffering timed out')
-  )
-}
 
 function normalizeProductBody(body: ProductBody): { data?: NormalizedProductInput; message?: string } {
   const name = body.name?.trim() ?? ''
@@ -175,7 +167,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   } catch (error) {
     const message = getErrorMessage(error)
 
-    if (message !== FALLBACK_PRODUCT_LOOKUP && !isConnectionError(message)) {
+    if (message !== FALLBACK_PRODUCT_LOOKUP && !isDatabaseUnavailableError(error)) {
       logServerError('products:update', error)
       return NextResponse.json({ message: 'Failed to update product.' }, { status: 500 })
     }
@@ -240,7 +232,7 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
   } catch (error) {
     const message = getErrorMessage(error)
 
-    if (message !== FALLBACK_PRODUCT_LOOKUP && !isConnectionError(message)) {
+    if (message !== FALLBACK_PRODUCT_LOOKUP && !isDatabaseUnavailableError(error)) {
       logServerError('products:delete', error)
       return NextResponse.json({ message: 'Failed to delete product.' }, { status: 500 })
     }
