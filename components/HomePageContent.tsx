@@ -21,7 +21,13 @@ type HomePageContentProps = {
 }
 
 export default function HomePageContent({ products, source, isLoggedIn }: HomePageContentProps) {
-  const { messages: t } = useLanguage()
+  const { locale, messages: t } = useLanguage()
+  const fallbackMessage =
+    products.length === 0
+      ? locale === 'ko'
+        ? '\uD604\uC7AC MongoDB\uC5D0 \uC5F0\uACB0\uD560 \uC218 \uC5C6\uC5B4 \uB4F1\uB85D\uB41C \uC0C1\uD488\uC744 \uBD88\uB7EC\uC624\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.'
+        : 'MongoDB is not reachable right now, so no products could be loaded.'
+      : t.home.fallback
 
   return (
     <div className="min-h-screen bg-[#f7f1e8] text-[#18261d]">
@@ -57,7 +63,7 @@ export default function HomePageContent({ products, source, isLoggedIn }: HomePa
 
         {source === 'fallback' && (
           <div className="mt-12 rounded-[24px] border border-[#d9c9b0] bg-[#fff6e9] p-4 text-sm text-[#6c5840]">
-            {t.home.fallback}
+            {fallbackMessage}
           </div>
         )}
 

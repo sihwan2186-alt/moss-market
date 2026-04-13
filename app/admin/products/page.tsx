@@ -2,7 +2,7 @@
 
 import Image from 'next/image'
 import Link from 'next/link'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLanguage } from '@/components/LanguageProvider'
 import StoreHeader from '@/components/StoreHeader'
 import { translateCategory } from '@/lib/i18n'
@@ -33,21 +33,9 @@ const emptyForm = {
   name: '',
   description: '',
   price: '',
-  imagesInput: '',
   stock: '0',
   category: 'General',
   featured: false,
-}
-
-function parseImageInput(value: string) {
-  return value
-    .split(/\r?\n|,/)
-    .map((image) => image.trim())
-    .filter((image) => image.length > 0)
-}
-
-function formatImageInput(images: string[]) {
-  return images.join('\n')
 }
 
 export default function AdminProductsPage() {
@@ -56,37 +44,56 @@ export default function AdminProductsPage() {
   const [name, setName] = useState(emptyForm.name)
   const [description, setDescription] = useState(emptyForm.description)
   const [price, setPrice] = useState(emptyForm.price)
-  const [imagesInput, setImagesInput] = useState(emptyForm.imagesInput)
   const [stock, setStock] = useState(emptyForm.stock)
   const [category, setCategory] = useState(emptyForm.category)
   const [featured, setFeatured] = useState(emptyForm.featured)
+  const [storedImages, setStoredImages] = useState<string[]>([])
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([])
+  const [localPreviewUrls, setLocalPreviewUrls] = useState<string[]>([])
   const [feedback, setFeedback] = useState<Feedback | null>(null)
   const [loading, setLoading] = useState(false)
   const [sessionLoading, setSessionLoading] = useState(true)
   const [user, setUser] = useState<SessionUser | null>(null)
   const [editingId, setEditingId] = useState('')
   const [restockNotifications, setRestockNotifications] = useState<string[]>([])
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   const copy = useMemo(
     () =>
       locale === 'ko'
         ? {
-            manageOrders: '주문 관리',
-            imageUrls: '이미지 URL 목록',
-            imageHint: '한 줄에 하나씩 입력하거나 쉼표로 구분하세요. 첫 번째 이미지가 대표 이미지가 됩니다.',
-            imageRequired: '이미지를 최소 한 장 이상 입력해 주세요.',
-            imageCount: '이미지 수',
-            restockTitle: '재입고 알림 처리됨',
-            restockHint: '재고가 0에서 다시 올라가며 아래 이메일에 재입고 알림이 반영되었습니다.',
-            noExtraImages: '추가 이미지 없음',
-            noImage: '이미지 없음',
+            manageOrders: '\uc8fc\ubb38 \uad00\ub9ac',
+            selectImages: '\uc0c1\ud488 \uc774\ubbf8\uc9c0 \uc120\ud0dd',
+            replaceImages: '\uc0c8 \uc774\ubbf8\uc9c0\ub85c \uad50\uccb4',
+            imageHint:
+              '\ucef4\ud4e8\ud130\uc5d0 \uc788\ub294 \uc774\ubbf8\uc9c0 \ud30c\uc77c\uc744 \uc120\ud0dd\ud558\uc138\uc694. \uccab \ubc88\uc9f8 \uc774\ubbf8\uc9c0\uac00 \ub300\ud45c \uc774\ubbf8\uc9c0\ub85c \uc0ac\uc6a9\ub429\ub2c8\ub2e4.',
+            editImageHint:
+              '\uc0c8 \ud30c\uc77c\uc744 \uc120\ud0dd\ud558\uba74 \ud604\uc7ac \uc774\ubbf8\uc9c0\ub97c \ub300\uccb4\ud569\ub2c8\ub2e4. \uc120\ud0dd\ud558\uc9c0 \uc54a\uc73c\uba74 \uae30\uc874 \uc774\ubbf8\uc9c0\ub97c \uadf8\ub300\ub85c \uc720\uc9c0\ud569\ub2c8\ub2e4.',
+            imageRequired: '\uc774\ubbf8\uc9c0\ub97c \ucd5c\uc18c 1\uc7a5 \uc120\ud0dd\ud574\uc8fc\uc138\uc694.',
+            imageCount: '\uc774\ubbf8\uc9c0',
+            currentImages: '\ud604\uc7ac \uc774\ubbf8\uc9c0',
+            selectedImages: '\uc120\ud0dd\ub41c \uc774\ubbf8\uc9c0',
+            keepCurrentImages: '\uae30\uc874 \uc774\ubbf8\uc9c0 \uc720\uc9c0',
+            uploadFailed: '\uc774\ubbf8\uc9c0 \uc5c5\ub85c\ub4dc\uc5d0 \uc2e4\ud328\ud588\uc2b5\ub2c8\ub2e4.',
+            restockTitle: '\uc7ac\uc785\uace0 \uc54c\ub9bc \ucc98\ub9ac \uc644\ub8cc',
+            restockHint:
+              '\uc7ac\uace0\uac00 0\uc5d0\uc11c \ub2e4\uc2dc \uc62c\ub77c\uac00\uba74 \uc544\ub798 \uc774\uba54\uc77c\uc5d0 \uc7ac\uc785\uace0 \uc54c\ub9bc\uc774 \ubc18\uc601\ub429\ub2c8\ub2e4.',
+            noExtraImages: '\ucd94\uac00 \uc774\ubbf8\uc9c0 \uc5c6\uc74c',
+            noImage: '\uc774\ubbf8\uc9c0 \uc5c6\uc74c',
           }
         : {
             manageOrders: 'Manage orders',
-            imageUrls: 'Image URLs',
-            imageHint: 'Add one image URL per line or separate them with commas. The first image becomes the cover.',
-            imageRequired: 'Please provide at least one image URL.',
+            selectImages: 'Select images',
+            replaceImages: 'Replace images',
+            imageHint: 'Choose image files from your computer. The first image becomes the primary product image.',
+            editImageHint:
+              'Selecting new files replaces the current images. Leave this empty to keep the existing images.',
+            imageRequired: 'Please select at least one image.',
             imageCount: 'Images',
+            currentImages: 'Current images',
+            selectedImages: 'Selected images',
+            keepCurrentImages: 'Keep current images',
+            uploadFailed: 'Image upload failed.',
             restockTitle: 'Restock notifications sent',
             restockHint: 'These emails were processed when the product moved back in stock.',
             noExtraImages: 'No extra images',
@@ -99,6 +106,18 @@ export default function AdminProductsPage() {
     const response = await fetch('/api/products', { cache: 'no-store' })
     const data = await response.json()
     setProducts(data.products ?? [])
+  }, [])
+
+  const resetSelectedFiles = useCallback(() => {
+    setSelectedFiles([])
+    setLocalPreviewUrls((currentUrls) => {
+      currentUrls.forEach((url) => URL.revokeObjectURL(url))
+      return []
+    })
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
   }, [])
 
   useEffect(() => {
@@ -119,16 +138,23 @@ export default function AdminProductsPage() {
     void bootstrap()
   }, [loadProducts])
 
+  useEffect(() => {
+    return () => {
+      localPreviewUrls.forEach((url) => URL.revokeObjectURL(url))
+    }
+  }, [localPreviewUrls])
+
   const resetForm = useCallback(() => {
     setName(emptyForm.name)
     setDescription(emptyForm.description)
     setPrice(emptyForm.price)
-    setImagesInput(emptyForm.imagesInput)
     setStock(emptyForm.stock)
     setCategory(emptyForm.category)
     setFeatured(emptyForm.featured)
+    setStoredImages([])
     setEditingId('')
-  }, [])
+    resetSelectedFiles()
+  }, [resetSelectedFiles])
 
   const applyFeedback = useCallback((isSuccess: boolean, message: string, nextRestockNotifications?: string[]) => {
     setFeedback({
@@ -138,18 +164,65 @@ export default function AdminProductsPage() {
     setRestockNotifications(Array.isArray(nextRestockNotifications) ? nextRestockNotifications : [])
   }, [])
 
-  const buildPayload = () => ({
-    name,
-    description,
-    price: Number(price),
-    images: parseImageInput(imagesInput),
-    stock: Number(stock),
-    category,
-    featured,
-  })
+  const buildPayload = useCallback(
+    (images: string[]) => ({
+      name,
+      description,
+      price: Number(price),
+      images,
+      stock: Number(stock),
+      category,
+      featured,
+    }),
+    [category, description, featured, name, price, stock]
+  )
+
+  const uploadSelectedFiles = useCallback(async () => {
+    if (selectedFiles.length === 0) {
+      return []
+    }
+
+    const formData = new FormData()
+
+    for (const file of selectedFiles) {
+      formData.append('files', file)
+    }
+
+    const response = await fetch('/api/uploads/product-images', {
+      method: 'POST',
+      body: formData,
+    })
+    const data = await response.json()
+
+    if (!response.ok || !Array.isArray(data.images) || data.images.length === 0) {
+      throw new Error(data.message ?? copy.uploadFailed)
+    }
+
+    return data.images as string[]
+  }, [copy.uploadFailed, selectedFiles])
+
+  const handleFileChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files ?? [])
+    setSelectedFiles(files)
+    setLocalPreviewUrls((currentUrls) => {
+      currentUrls.forEach((url) => URL.revokeObjectURL(url))
+      return files.map((file) => URL.createObjectURL(file))
+    })
+  }, [])
 
   const handleSubmit = async () => {
-    const images = parseImageInput(imagesInput)
+    let images = storedImages
+
+    if (selectedFiles.length > 0) {
+      try {
+        setLoading(true)
+        images = await uploadSelectedFiles()
+      } catch (error) {
+        applyFeedback(false, error instanceof Error ? error.message : copy.uploadFailed)
+        setLoading(false)
+        return
+      }
+    }
 
     if (images.length === 0) {
       applyFeedback(false, copy.imageRequired)
@@ -164,10 +237,7 @@ export default function AdminProductsPage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          ...buildPayload(),
-          images,
-        }),
+        body: JSON.stringify(buildPayload(images)),
       })
 
       const data = await response.json()
@@ -193,10 +263,11 @@ export default function AdminProductsPage() {
     setName(product.name)
     setDescription(product.description)
     setPrice(String(product.price))
-    setImagesInput(formatImageInput(product.images))
     setStock(String(product.stock))
     setCategory(product.category)
     setFeatured(product.featured)
+    setStoredImages(product.images)
+    resetSelectedFiles()
     setFeedback({
       tone: 'success',
       text: t.adminProducts.editingProduct,
@@ -263,6 +334,8 @@ export default function AdminProductsPage() {
     }
   }
 
+  const previewImages = localPreviewUrls.length > 0 ? localPreviewUrls : storedImages
+  const previewLabel = localPreviewUrls.length > 0 ? copy.selectedImages : copy.currentImages
   const isAdmin = user?.role === 'admin'
 
   return (
@@ -338,6 +411,7 @@ export default function AdminProductsPage() {
                     </button>
                   )}
                 </div>
+
                 <div className="mt-5 space-y-4">
                   <input
                     value={name}
@@ -358,15 +432,69 @@ export default function AdminProductsPage() {
                     type="number"
                     className="w-full rounded-2xl border border-black/10 px-4 py-3"
                   />
-                  <div>
-                    <textarea
-                      value={imagesInput}
-                      onChange={(event) => setImagesInput(event.target.value)}
-                      placeholder={copy.imageUrls}
-                      className="min-h-32 w-full rounded-2xl border border-black/10 px-4 py-3"
+
+                  <div className="space-y-3 rounded-[24px] border border-black/10 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-[#1d3124]">
+                          {editingId ? copy.replaceImages : copy.selectImages}
+                        </p>
+                        <p className="mt-1 text-xs leading-5 text-[#5d6a61]">
+                          {editingId ? copy.editImageHint : copy.imageHint}
+                        </p>
+                      </div>
+                      {editingId && localPreviewUrls.length > 0 && storedImages.length > 0 && (
+                        <button
+                          onClick={resetSelectedFiles}
+                          className="text-xs font-semibold text-[#1d3124] underline underline-offset-4"
+                          type="button"
+                        >
+                          {copy.keepCurrentImages}
+                        </button>
+                      )}
+                    </div>
+
+                    <input
+                      ref={fileInputRef}
+                      accept="image/*"
+                      multiple
+                      onChange={handleFileChange}
+                      className="block w-full cursor-pointer rounded-2xl border border-dashed border-black/15 bg-[#faf7f1] px-4 py-3 text-sm text-[#425247] file:mr-4 file:rounded-full file:border-0 file:bg-[#1d3124] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white"
+                      type="file"
                     />
-                    <p className="mt-2 text-xs leading-5 text-[#5d6a61]">{copy.imageHint}</p>
+
+                    {previewImages.length > 0 && (
+                      <div className="space-y-3">
+                        <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#68806f]">
+                          {previewLabel} {previewImages.length}
+                        </p>
+                        <div className="grid grid-cols-2 gap-3">
+                          {previewImages
+                            .slice(0, 4)
+                            .map((image, index) =>
+                              localPreviewUrls.length > 0 ? (
+                                <img
+                                  key={`${image}-${index}`}
+                                  src={image}
+                                  alt={`Selected product preview ${index + 1}`}
+                                  className="h-28 w-full rounded-2xl object-cover"
+                                />
+                              ) : (
+                                <Image
+                                  key={`${image}-${index}`}
+                                  src={image}
+                                  alt={`Stored product preview ${index + 1}`}
+                                  width={240}
+                                  height={180}
+                                  className="h-28 w-full rounded-2xl object-cover"
+                                />
+                              )
+                            )}
+                        </div>
+                      </div>
+                    )}
                   </div>
+
                   <input
                     value={stock}
                     onChange={(event) => setStock(event.target.value)}
