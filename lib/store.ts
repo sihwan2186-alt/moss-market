@@ -1,5 +1,6 @@
 import dbConnect from '@/db/dbConnect'
 import Product from '@/db/models/product'
+import { findLocalProductById, getLocalProducts } from '@/lib/dev-store'
 import { deprecatedSampleProductNames, seedProducts } from '@/lib/sample-products'
 import { logServerError } from '@/lib/server-error'
 
@@ -112,10 +113,7 @@ export async function getProductsWithFallback(): Promise<{
     logServerError('store:getProductsWithFallback', error)
 
     return {
-      products: seedProducts.map((product, index) => ({
-        _id: `fallback-${index + 1}`,
-        ...product,
-      })),
+      products: await getLocalProducts(),
       source: 'fallback',
     }
   }
@@ -135,16 +133,9 @@ export async function getProductByIdWithFallback(productId: string): Promise<{
     }
   } catch (error) {
     logServerError('store:getProductByIdWithFallback', error)
-    const fallbackProduct =
-      seedProducts
-        .map((product, index) => ({
-          _id: `fallback-${index + 1}`,
-          ...product,
-        }))
-        .find((product) => product._id === productId) ?? null
 
     return {
-      product: fallbackProduct,
+      product: await findLocalProductById(productId),
       source: 'fallback',
     }
   }

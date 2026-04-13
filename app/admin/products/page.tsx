@@ -470,28 +470,27 @@ export default function AdminProductsPage() {
                           {previewLabel} {previewImages.length}
                         </p>
                         <div className="grid grid-cols-2 gap-3">
-                          {previewImages
-                            .slice(0, 4)
-                            .map((image, index) =>
-                              localPreviewUrls.length > 0 ? (
-                                <img
-                                  key={`${image}-${index}`}
-                                  src={image}
-                                  alt={`Selected product preview ${index + 1}`}
-                                  className="h-28 w-full rounded-2xl object-cover"
-                                />
-                              ) : (
-                                <Image
-                                  key={`${image}-${index}`}
-                                  src={image}
-                                  alt={`Stored product preview ${index + 1}`}
-                                  width={240}
-                                  height={180}
-                                  unoptimized={shouldBypassProductImageOptimization(image)}
-                                  className="h-28 w-full rounded-2xl object-cover"
-                                />
-                              )
-                            )}
+                          {previewImages.slice(0, 4).map((image, index) =>
+                            localPreviewUrls.length > 0 ? (
+                              /* eslint-disable-next-line @next/next/no-img-element */
+                              <img
+                                key={`${image}-${index}`}
+                                src={image}
+                                alt={`Selected product preview ${index + 1}`}
+                                className="h-28 w-full rounded-2xl object-cover"
+                              />
+                            ) : (
+                              <Image
+                                key={`${image}-${index}`}
+                                src={image}
+                                alt={`Stored product preview ${index + 1}`}
+                                width={240}
+                                height={180}
+                                unoptimized={shouldBypassProductImageOptimization(image)}
+                                className="h-28 w-full rounded-2xl object-cover"
+                              />
+                            )
+                          )}
                         </div>
                       </div>
                     )}

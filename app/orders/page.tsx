@@ -78,9 +78,9 @@ export default function OrdersPage() {
             noShipping: '배송지 정보 없음',
             noPayment: '테스트 결제 정보 없음',
             noNote: '메모 없음',
-            netTotal: '실결제',
+            netTotal: '실결제 금액',
             refunded: '환불 금액',
-            refundable: '환불 완료',
+            refundable: '환불 수량',
           }
         : {
             contact: 'Contact',
@@ -217,7 +217,7 @@ export default function OrdersPage() {
                   <div className="rounded-[24px] bg-[#faf7f1] p-4">
                     <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#68806f]">{copy.payment}</p>
                     <p className="mt-3 text-sm font-semibold text-[#18261d]">
-                      {order.paymentLast4 ? `•••• ${order.paymentLast4}` : copy.noPayment}
+                      {order.paymentLast4 ? `**** ${order.paymentLast4}` : copy.noPayment}
                     </p>
                   </div>
                 </div>

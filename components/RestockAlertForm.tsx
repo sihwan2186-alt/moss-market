@@ -21,7 +21,7 @@ export default function RestockAlertForm({ productId }: RestockAlertFormProps) {
         ? {
             title: '재입고 알림',
             placeholder: '알림을 받을 이메일',
-            hint: '이 상품이 다시 입고되면 알림을 보낼 수 있도록 등록합니다.',
+            hint: '이 상품이 다시 입고되면 알림을 받을 수 있도록 등록합니다.',
             activeEmail: '현재 로그인한 계정 이메일로 알림을 받습니다.',
             submit: '재입고 알림 신청',
             submitting: '신청 중...',

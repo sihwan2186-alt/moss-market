@@ -97,7 +97,16 @@ export default function CartPage() {
   const checkout = async () => {
     try {
       setOrdering(true)
-      const response = await fetch('/api/orders', { method: 'POST' })
+      const response = await fetch('/api/orders', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          customerName: paymentName.trim(),
+          paymentCardNumber: paymentNumber,
+        }),
+      })
       const data = await response.json()
       setMessage(data.message ?? (response.ok ? t.cart.orderPlaced : t.cart.checkoutFailed))
 

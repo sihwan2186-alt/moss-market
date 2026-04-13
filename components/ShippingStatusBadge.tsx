@@ -18,8 +18,8 @@ const shippingStatusLabels = {
     shipped: 'Shipped',
   },
   ko: {
-    preparing: '배송 전',
-    shipped: '출발 완료',
+    preparing: '배송 준비',
+    shipped: '배송 완료',
   },
 } as const
 

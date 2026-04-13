@@ -88,7 +88,7 @@ export default function OrderDetailPage() {
             netTotal: '실결제 금액',
             refundHistory: '환불 이력',
             noRefundHistory: '환불 이력이 없습니다.',
-            refundedQuantity: '환불 완료',
+            refundedQuantity: '환불 수량',
           }
         : {
             contact: 'Contact',
@@ -209,7 +209,7 @@ export default function OrderDetailPage() {
                 </div>
                 <div className="rounded-[24px] bg-[#faf7f1] p-5">
                   <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#68806f]">{copy.payment}</p>
-                  <p className="mt-3 text-3xl font-black">{order.paymentLast4 ? `•••• ${order.paymentLast4}` : '-'}</p>
+                  <p className="mt-3 text-3xl font-black">{order.paymentLast4 ? `**** ${order.paymentLast4}` : '-'}</p>
                 </div>
                 <div className="rounded-[24px] bg-[#faf7f1] p-5">
                   <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#68806f]">{copy.netTotal}</p>
