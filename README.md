@@ -41,6 +41,7 @@ Create `.env.local` in the project root:
 MONGODB_URI=your-mongodb-connection-string
 JWT_SECRET=your-long-random-secret
 AUTH_SECRET=optional-nextauth-secret
+BLOB_READ_WRITE_TOKEN=optional-vercel-blob-token
 ```
 
 ## Install and run
@@ -97,7 +98,7 @@ Recommended deploy flow:
 
 1. Push the project to GitHub
 2. Import the repo into Vercel
-3. Add `MONGODB_URI` and `JWT_SECRET` in Vercel project settings
+3. Add `MONGODB_URI`, `JWT_SECRET`, and `BLOB_READ_WRITE_TOKEN` in Vercel project settings
 4. Allow Vercel access in MongoDB Atlas network settings
 5. Open `/health` after deployment and confirm the database check passes
 
