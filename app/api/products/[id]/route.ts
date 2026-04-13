@@ -135,6 +135,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     return NextResponse.json({ message: normalized.message }, { status: 400 })
   }
 
+  const productInput = normalized.data
+
   try {
     if (!mongoose.Types.ObjectId.isValid(id)) {
       throw new Error(FALLBACK_PRODUCT_LOOKUP)
@@ -149,10 +151,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     const previousStock = existingProduct.stock
     const previousImages = [...existingProduct.images]
-    existingProduct.set(normalized.data)
+    existingProduct.set(productInput)
     await existingProduct.save()
 
-    const removedImages = previousImages.filter((image) => !normalized.data.images.includes(image))
+    const removedImages = previousImages.filter((image) => !productInput.images.includes(image))
 
     try {
       await removeStoredProductImages(removedImages)
@@ -160,8 +162,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       logServerError('products:update-image-cleanup', error)
     }
 
-    const restockNotifications =
-      previousStock <= 0 && normalized.data.stock > 0 ? await notifyRestockSubscribers(id) : []
+    const restockNotifications = previousStock <= 0 && productInput.stock > 0 ? await notifyRestockSubscribers(id) : []
 
     return NextResponse.json(
       {
